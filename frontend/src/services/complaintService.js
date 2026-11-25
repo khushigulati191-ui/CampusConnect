@@ -106,7 +106,7 @@ const mock = {
       createdAt: now,
       updatedAt: now,
       timeline: [
-        { status: STATUS.PENDING, at: now, note: 'Complaint submitted and added to the queue.' },
+        { status: STATUS.PENDING, at: now, note: 'Complaint submitted and registered in CampusConnect.' },
       ],
     };
     writeStore([...list, complaint]);
@@ -120,9 +120,9 @@ const mock = {
     if (index === -1) throw new ApiError('Complaint not found', 404);
     const now = new Date().toISOString();
     const notes = {
-      [STATUS.PENDING]: 'Complaint moved back to the queue.',
-      [STATUS.IN_PROGRESS]: 'Assigned to the maintenance team. Work has started.',
-      [STATUS.RESOLVED]: 'Issue fixed and verified by the facilities office.',
+      [STATUS.PENDING]: 'Complaint moved back to pending status.',
+      [STATUS.IN_PROGRESS]: 'Under review by authority. Assigned to the maintenance team.',
+      [STATUS.RESOLVED]: 'Issue reviewed and closed by campus authority.',
     };
     const updated = {
       ...list[index],

@@ -4,8 +4,8 @@ import {
   AlertCircle,
   Check,
   CheckCircle2,
+  ClipboardCheck,
   Copy,
-  ListOrdered,
   Search,
   Send,
 } from 'lucide-react';
@@ -173,7 +173,7 @@ export default function SubmitComplaint() {
               </span>
               <h2 className="mt-5 text-2xl font-extrabold tracking-tight">Complaint submitted!</h2>
               <p className="mt-2 text-sm text-ink-500">
-                It has been added to the end of the queue. Save your complaint ID to track it.
+                It has been recorded in CampusConnect. Save your complaint ID to track its review and resolution.
               </p>
 
               <div className="mx-auto mt-6 flex max-w-sm items-center justify-between gap-3 rounded-2xl border border-dashed border-brand-300 bg-brand-50 px-5 py-4">
@@ -325,7 +325,7 @@ export default function SubmitComplaint() {
             <ol className="mt-4 space-y-4">
               {[
                 ['You submit', 'We generate a unique complaint ID for you.'],
-                ['It joins the queue', 'Complaints are handled first-in, first-out.'],
+                ['Under review', 'Campus authorities review and assign complaints to maintenance.'],
                 ['Track progress', 'Use your ID to see Pending, In Progress or Resolved.'],
               ].map(([title, text], i) => (
                 <li key={title} className="flex gap-3">
@@ -342,13 +342,13 @@ export default function SubmitComplaint() {
           </div>
 
           <Link
-            to="/queue"
+            to="/review"
             className="group relative block overflow-hidden rounded-3xl bg-mustard p-5 text-ink transition hover:shadow-pop"
           >
             <div className="absolute -right-6 -top-6 h-24 w-24 rounded-3xl border-[12px] border-white/20" aria-hidden="true" />
-            <ListOrdered size={22} />
-            <p className="mt-3 text-base font-bold">See the live queue</p>
-            <p className="mt-1 text-sm opacity-80">Find out how many complaints are ahead of yours.</p>
+            <ClipboardCheck size={22} />
+            <p className="mt-3 text-base font-bold">Review Desk</p>
+            <p className="mt-1 text-sm opacity-80">Track how complaints are triaged and resolved by authorities.</p>
           </Link>
         </aside>
       </div>

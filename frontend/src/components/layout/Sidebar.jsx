@@ -1,10 +1,43 @@
 import { NavLink, Link } from 'react-router-dom';
-import { GraduationCap, LifeBuoy, X } from 'lucide-react';
-import { NAV_ITEMS } from '../../constants';
+import {
+  ArrowRightLeft,
+  Building2,
+  ClipboardCheck,
+  FilePlus2,
+  GraduationCap,
+  History,
+  LayoutDashboard,
+  LifeBuoy,
+  PackageSearch,
+  Search,
+  Shield,
+  X,
+} from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { useComplaints } from '../../context/ComplaintsContext';
 
 export default function Sidebar({ open, onClose }) {
   const { stats } = useComplaints();
+  const { user, isAdmin, switchRole, activeCollege } = useAuth();
+
+  const studentNav = [
+    { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+    { to: '/submit', label: 'Submit Complaint', icon: FilePlus2 },
+    { to: '/track', label: 'Track Complaint', icon: Search },
+    { to: '/review', label: 'Review Complaints', icon: ClipboardCheck, showPendingCount: true },
+    { to: '/history', label: 'Complaint History', icon: History },
+    { to: '/lost-and-found', label: 'Lost & Found', icon: PackageSearch },
+  ];
+
+  const adminNav = [
+    { to: '/admin', label: 'Admin Dashboard', icon: LayoutDashboard, end: true },
+    { to: '/review', label: 'Review Desk', icon: ClipboardCheck, showPendingCount: true },
+    { to: '/history', label: 'Complaints Archive', icon: History },
+    { to: '/lost-and-found', label: 'Lost & Found Registry', icon: PackageSearch },
+    { to: '/colleges', label: 'Affiliated Colleges', icon: Building2 },
+  ];
+
+  const navItems = isAdmin ? adminNav : studentNav;
 
   return (
     <>
@@ -23,14 +56,23 @@ export default function Sidebar({ open, onClose }) {
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
+        {/* Brand Header */}
         <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3" onClick={onClose}>
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 shadow-lg shadow-brand-900/40">
-              <GraduationCap size={22} />
+          <Link to={isAdmin ? '/admin' : '/'} className="flex items-center gap-3" onClick={onClose}>
+            <span
+              className={`grid h-10 w-10 place-items-center rounded-xl shadow-lg ${
+                isAdmin
+                  ? 'bg-amber-600 shadow-amber-900/40'
+                  : 'bg-brand-600 shadow-brand-900/40'
+              }`}
+            >
+              {isAdmin ? <Shield size={22} /> : <GraduationCap size={22} />}
             </span>
             <span className="leading-tight">
-              <span className="block text-base font-bold tracking-tight">Campus Helpdesk</span>
-              <span className="block text-xs text-ink-300">Smart complaint system</span>
+              <span className="block text-base font-bold tracking-tight">CampusConnect</span>
+              <span className="block text-[11px] font-semibold text-amber-300">
+                {isAdmin ? 'MSIT Authority Console' : 'MSIT Student Portal'}
+              </span>
             </span>
           </Link>
           <button
@@ -43,8 +85,9 @@ export default function Sidebar({ open, onClose }) {
           </button>
         </div>
 
-        <nav aria-label="Main navigation" className="mt-12 flex-1 space-y-2 overflow-y-auto">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, end, showQueueCount }) => (
+        {/* Navigation */}
+        <nav aria-label="Main navigation" className="mt-8 flex-1 space-y-1.5 overflow-y-auto">
+          {navItems.map(({ to, label, icon: Icon, end, showPendingCount }) => (
             <NavLink
               key={to}
               to={to}
@@ -68,9 +111,9 @@ export default function Sidebar({ open, onClose }) {
                     <Icon size={18} />
                   </span>
                   <span className="flex-1">{label}</span>
-                  {showQueueCount && stats.active > 0 && (
-                    <span className="grid min-w-[1.5rem] place-items-center rounded-full bg-coral px-1.5 py-0.5 text-[11px] font-bold">
-                      {stats.active}
+                  {showPendingCount && stats.pending > 0 && (
+                    <span className="grid min-w-[1.5rem] place-items-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold text-white">
+                      {stats.pending}
                     </span>
                   )}
                 </>
@@ -79,22 +122,33 @@ export default function Sidebar({ open, onClose }) {
           ))}
         </nav>
 
-        <div className="relative mt-6 overflow-hidden rounded-3xl bg-white/10 p-5">
-          <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-brand-500/30" aria-hidden="true" />
-          <div className="absolute -bottom-10 right-6 h-20 w-20 rounded-full bg-coral/20" aria-hidden="true" />
-          <LifeBuoy size={22} className="relative text-brand-300" />
-          <p className="relative mt-3 text-base font-semibold leading-snug">
-            Need urgent help on campus?
-          </p>
-          <p className="relative mt-1 text-xs text-ink-300">
-            Reach the helpdesk team directly for emergencies.
-          </p>
-          <a
-            href="mailto:helpdesk@smartcampus.edu"
-            className="relative mt-4 block rounded-xl bg-white py-2.5 text-center text-sm font-semibold text-ink transition hover:bg-brand-50"
+        {/* Role Quick Switcher for Developer Testing */}
+        <div className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-3">
+          <div className="flex items-center justify-between text-[11px] text-ink-300">
+            <span>Active Role</span>
+            <span className="font-bold uppercase text-white tracking-wider">
+              {isAdmin ? 'Authority (Admin)' : 'Student'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={switchRole}
+            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-xl bg-white/10 py-1.5 text-xs font-semibold text-white hover:bg-white/20 transition"
           >
-            Contact helpdesk
-          </a>
+            <ArrowRightLeft size={13} />
+            Switch to {isAdmin ? 'Student View' : 'Admin Console'}
+          </button>
+        </div>
+
+        {/* Support Card */}
+        <div className="relative mt-4 overflow-hidden rounded-3xl bg-white/10 p-4">
+          <LifeBuoy size={20} className="relative text-brand-300" />
+          <p className="relative mt-2 text-sm font-semibold leading-snug">
+            {activeCollege?.shortName || 'MSIT'} Helpdesk
+          </p>
+          <p className="relative mt-0.5 text-[11px] text-ink-300">
+            Janakpuri Campus, New Delhi
+          </p>
         </div>
       </aside>
     </>

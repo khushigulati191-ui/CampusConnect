@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { FileX2, FilePlus2, Search, X } from 'lucide-react';
-import { CATEGORIES, STATUS_FLOW } from '../constants';
+import { FileX2, FilePlus2, Search, User, X } from 'lucide-react';
+import { CATEGORIES, CURRENT_USER, STATUS_FLOW } from '../constants';
 import { useComplaints } from '../context/ComplaintsContext';
 import PageHeader from '../components/ui/PageHeader';
 import Drawer from '../components/ui/Drawer';
@@ -15,6 +15,7 @@ export default function ComplaintHistory() {
 
   // The search text lives in the URL so the top bar search can drive it
   const query = searchParams.get('q') ?? '';
+  const [scope, setScope] = useState('All'); // 'All' = all campus complaints, 'My' = current student's complaints
   const [status, setStatus] = useState('All');
   const [category, setCategory] = useState('All');
   const [sort, setSort] = useState('newest');
@@ -27,9 +28,26 @@ export default function ComplaintHistory() {
     setSearchParams(next, { replace: true });
   };
 
+  const myComplaintsCount = useMemo(() => {
+    return complaints.filter(
+      (c) =>
+        c.rollNo?.toUpperCase() === CURRENT_USER.rollNo.toUpperCase() ||
+        c.studentName?.toLowerCase() === CURRENT_USER.name.toLowerCase(),
+    ).length;
+  }, [complaints]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return complaints
+      .filter((c) => {
+        if (scope === 'My') {
+          return (
+            c.rollNo?.toUpperCase() === CURRENT_USER.rollNo.toUpperCase() ||
+            c.studentName?.toLowerCase() === CURRENT_USER.name.toLowerCase()
+          );
+        }
+        return true; // 'All': show every complaint on campus irrespective of login!
+      })
       .filter((c) => status === 'All' || c.status === status)
       .filter((c) => category === 'All' || c.category === category)
       .filter(
@@ -45,7 +63,7 @@ export default function ComplaintHistory() {
           ? new Date(b.createdAt) - new Date(a.createdAt)
           : new Date(a.createdAt) - new Date(b.createdAt),
       );
-  }, [complaints, query, status, category, sort]);
+  }, [complaints, scope, query, status, category, sort]);
 
   const filtersActive = query || status !== 'All' || category !== 'All';
   const clearFilters = () => {
@@ -69,6 +87,45 @@ export default function ComplaintHistory() {
       />
 
       <div className="card overflow-hidden">
+        {/* Scope bar: All Complaints vs My Complaints */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-slate-50/80 px-4 py-3 sm:px-5">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setScope('All')}
+              className={`rounded-xl px-4 py-1.5 text-xs font-bold transition ${
+                scope === 'All'
+                  ? 'bg-ink text-white shadow-sm'
+                  : 'border border-slate-200 bg-white text-ink-600 hover:bg-slate-100'
+              }`}
+            >
+              All Complaints ({loading ? '–' : complaints.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setScope('My')}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-xs font-bold transition ${
+                scope === 'My'
+                  ? 'bg-brand-600 text-white shadow-sm'
+                  : 'border border-slate-200 bg-white text-ink-600 hover:bg-slate-100'
+              }`}
+            >
+              <User size={13} />
+              My Complaints ({loading ? '–' : myComplaintsCount})
+            </button>
+          </div>
+
+          <span className="text-xs text-ink-500">
+            {scope === 'All' ? (
+              <span>Showing all complaints across campus irrespective of login</span>
+            ) : (
+              <span>
+                Filtered by your profile: <strong>{CURRENT_USER.name}</strong> ({CURRENT_USER.rollNo})
+              </span>
+            )}
+          </span>
+        </div>
+
         {/* Filters */}
         <div className="space-y-4 border-b border-slate-100 p-4 sm:p-5">
           <div className="flex flex-col gap-3 lg:flex-row">

@@ -4,11 +4,12 @@ import {
   ArrowRight,
   ArrowUpRight,
   CheckCircle2,
+  ClipboardCheck,
   Clock,
   FilePlus2,
   Inbox,
-  ListOrdered,
   Loader,
+  PackageSearch,
   Search,
 } from 'lucide-react';
 import { CURRENT_USER } from '../constants';
@@ -45,7 +46,7 @@ function QuickCard({ to, title, text, icon: Icon, className }) {
 }
 
 export default function Dashboard() {
-  const { complaints, fifo, stats, loading, error, reload } = useComplaints();
+  const { complaints, stats, loading, error, reload } = useComplaints();
   const navigate = useNavigate();
   const [trackId, setTrackId] = useState('');
 
@@ -55,7 +56,7 @@ export default function Dashboard() {
     navigate(id ? `/track?id=${encodeURIComponent(id)}` : '/track');
   };
 
-  const nextUp = fifo.find((c) => c.status !== 'Resolved');
+  const awaitingReview = complaints.find((c) => c.status === 'Pending') || complaints.find((c) => c.status !== 'Resolved');
 
   return (
     <div className="space-y-8">
@@ -64,12 +65,12 @@ export default function Dashboard() {
         <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand-600/40 blur-2xl" aria-hidden="true" />
         <div className="absolute -bottom-24 right-40 h-56 w-56 rounded-full bg-tealdeep/50 blur-2xl" aria-hidden="true" />
         <div className="relative max-w-2xl">
-          <p className="text-sm font-semibold text-brand-300">Smart Campus Helpdesk</p>
+          <p className="text-sm font-semibold text-brand-300">CampusConnect</p>
           <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">
             Welcome back, {CURRENT_USER.firstName}.
           </h1>
           <p className="mt-2 text-sm text-ink-300 sm:text-base">
-            Report a campus problem, follow its progress, and see exactly where it sits in the queue.
+            Report a campus problem, track review status, and see issues resolved quickly by authorities.
           </p>
 
           <form onSubmit={handleTrack} className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -78,7 +79,7 @@ export default function Dashboard() {
               <input
                 value={trackId}
                 onChange={(e) => setTrackId(e.target.value)}
-                placeholder="Enter complaint ID, e.g. CMP-2026-0014"
+                placeholder="Enter complaint ID, e.g. CMP-2026-0001"
                 aria-label="Complaint ID"
                 className="w-full rounded-full bg-white py-3 pl-11 pr-4 text-sm text-ink placeholder:text-ink-400 focus:outline-none focus:ring-4 focus:ring-brand-400/40"
               />
@@ -147,10 +148,10 @@ export default function Dashboard() {
                 className="bg-coral text-white"
               />
               <QuickCard
-                to="/queue"
-                icon={ListOrdered}
-                title="View the FIFO queue"
-                text="Oldest complaints are handled first."
+                to="/lost-and-found"
+                icon={PackageSearch}
+                title="Lost & Found"
+                text="Report or find lost belongings on campus."
                 className="bg-mustard text-ink"
               />
             </div>
@@ -187,23 +188,28 @@ export default function Dashboard() {
 
             <div className="space-y-6">
               <div className="card p-5">
-                <h2 className="text-lg font-bold">Next in queue</h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-bold">Awaiting Review</h2>
+                  <Link to="/review" className="text-xs font-semibold text-brand-700 hover:underline">
+                    Review desk
+                  </Link>
+                </div>
                 {loading ? (
                   <div className="mt-4 h-24 animate-pulse rounded-xl bg-slate-100" />
-                ) : nextUp ? (
+                ) : awaitingReview ? (
                   <Link
-                    to={`/track?id=${encodeURIComponent(nextUp.id)}`}
+                    to={`/review`}
                     className="mt-4 block rounded-2xl bg-slate-50 p-4 transition hover:bg-brand-50"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-xs font-bold text-ink-500">{nextUp.id}</span>
-                      <StatusBadge status={nextUp.status} variant="queue" />
+                      <span className="font-mono text-xs font-bold text-brand-700">{awaitingReview.id}</span>
+                      <StatusBadge status={awaitingReview.status} />
                     </div>
-                    <p className="mt-2 font-semibold leading-snug">{nextUp.title}</p>
-                    <p className="mt-1 text-xs text-ink-500">Waiting {waitingTime(nextUp.createdAt)}</p>
+                    <p className="mt-2 font-semibold leading-snug">{awaitingReview.title}</p>
+                    <p className="mt-1 text-xs text-ink-500">Submitted {waitingTime(awaitingReview.createdAt)} ago</p>
                   </Link>
                 ) : (
-                  <p className="mt-3 text-sm text-ink-500">The queue is empty. Nice work, campus!</p>
+                  <p className="mt-3 text-sm text-ink-500">No complaints pending review. All caught up!</p>
                 )}
               </div>
 

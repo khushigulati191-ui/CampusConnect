@@ -3,7 +3,8 @@ import {
   FilePlus2,
   Search,
   History,
-  ListOrdered,
+  ClipboardCheck,
+  PackageSearch,
   Zap,
   Wifi,
   Droplets,
@@ -28,8 +29,9 @@ export const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/submit', label: 'Submit Complaint', icon: FilePlus2 },
   { to: '/track', label: 'Track Complaint', icon: Search },
+  { to: '/review', label: 'Review Complaints', icon: ClipboardCheck, showPendingCount: true },
   { to: '/history', label: 'Complaint History', icon: History },
-  { to: '/queue', label: 'FIFO Queue', icon: ListOrdered, showQueueCount: true },
+  { to: '/lost-and-found', label: 'Lost & Found', icon: PackageSearch },
 ];
 
 export const DEPARTMENTS = [
