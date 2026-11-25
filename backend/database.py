@@ -3,8 +3,8 @@ CampusConnect - Database Layer (SQLite)
 
 This module handles:
 1. Connecting to SQLite ('campus_connect.db').
-2. Creating the 'complaints' table.
-3. Reading, inserting, and updating complaints.
+2. Creating 'complaints', 'lost_and_found', and 'affiliated_colleges' tables.
+3. Reading, inserting, and updating records across student & authority workflows.
 """
 
 import json
@@ -23,7 +23,7 @@ def get_db():
 
 
 def init_db():
-    """Creates an empty 'complaints' table if it does not already exist."""
+    """Creates tables if they do not already exist, and seeds MSIT as the primary affiliated college."""
     conn = get_db()
     conn.execute(
         """
@@ -43,9 +43,72 @@ def init_db():
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS lost_and_found (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            category TEXT NOT NULL,
+            description TEXT NOT NULL,
+            location TEXT NOT NULL,
+            item_date TEXT NOT NULL,
+            contact_name TEXT NOT NULL,
+            contact_info TEXT NOT NULL,
+            roll_no TEXT NOT NULL,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS affiliated_colleges (
+            id TEXT PRIMARY KEY,
+            code TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            short_name TEXT NOT NULL,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL,
+            domain TEXT NOT NULL,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()
+
+    # Seed MSIT as the test case affiliated college if empty
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM affiliated_colleges")
+    if cursor.fetchone()[0] == 0:
+        now = datetime.now(timezone.utc).isoformat()
+        cursor.execute(
+            """
+            INSERT INTO affiliated_colleges (
+                id, code, name, short_name, city, state, domain, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "COL-MSIT-01",
+                "MSIT",
+                "Maharaja Surajmal Institute of Technology",
+                "MSIT",
+                "Janakpuri, New Delhi",
+                "Delhi",
+                "msit.in",
+                "Active",
+                now,
+            ),
+        )
+        conn.commit()
+
     conn.close()
 
+
+# ---------------------------------------------------------------------------
+# Complaints Helpers & Queries
+# ---------------------------------------------------------------------------
 
 def row_to_dict(row: sqlite3.Row) -> dict:
     """Formats database row into camelCase JSON for the frontend."""
@@ -107,12 +170,11 @@ def create_complaint(data: dict) -> dict:
     complaint_id = generate_id(cursor)
     now = datetime.now(timezone.utc).isoformat()
 
-    # Initial timeline entry
     initial_timeline = [
         {
             "status": "Pending",
             "at": now,
-            "note": "Complaint submitted and added to the queue.",
+            "note": "Complaint submitted and registered in CampusConnect.",
         }
     ]
 
@@ -158,9 +220,9 @@ def update_complaint_status(complaint_id: str, new_status: str):
     timeline = json.loads(row["timeline"]) if row["timeline"] else []
 
     status_notes = {
-        "Pending": "Complaint moved back to the queue.",
-        "In Progress": "Assigned to the maintenance team. Work has started.",
-        "Resolved": "Issue fixed and verified by the facilities office.",
+        "Pending": "Complaint moved back to pending status.",
+        "In Progress": "Under review by authority. Assigned to the maintenance team.",
+        "Resolved": "Issue reviewed and closed by campus authority.",
     }
     note = status_notes.get(new_status, f"Status updated to {new_status}.")
     timeline.append({"status": new_status, "at": now, "note": note})
@@ -177,3 +239,158 @@ def update_complaint_status(complaint_id: str, new_status: str):
     conn.close()
 
     return get_complaint_by_id(complaint_id)
+
+
+# ---------------------------------------------------------------------------
+# Lost & Found Helpers & Queries
+# ---------------------------------------------------------------------------
+
+def lost_found_row_to_dict(row: sqlite3.Row) -> dict:
+    """Formats a lost_and_found DB row into camelCase JSON for the frontend."""
+    return {
+        "id": row["id"],
+        "type": row["type"],               # 'Lost' or 'Found'
+        "title": row["title"],
+        "category": row["category"],
+        "description": row["description"],
+        "location": row["location"],
+        "itemDate": row["item_date"],
+        "contactName": row["contact_name"],
+        "contactInfo": row["contact_info"],
+        "rollNo": row["roll_no"],
+        "status": row["status"],           # 'Open' or 'Claimed'
+        "createdAt": row["created_at"],
+    }
+
+
+def generate_lost_found_id(cursor) -> str:
+    """Generates LF-YYYY-0001, LF-YYYY-0002, etc."""
+    year = datetime.now(timezone.utc).year
+    cursor.execute("SELECT id FROM lost_and_found WHERE id LIKE ?", (f"LF-{year}-%",))
+    rows = cursor.fetchall()
+    numbers = []
+    for r in rows:
+        parts = r["id"].split("-")
+        if len(parts) == 3 and parts[2].isdigit():
+            numbers.append(int(parts[2]))
+    next_num = max(numbers, default=0) + 1
+    return f"LF-{year}-{str(next_num).zfill(4)}"
+
+
+def get_all_lost_found() -> list:
+    """Returns all lost and found items ordered with newest first."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM lost_and_found ORDER BY datetime(created_at) DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [lost_found_row_to_dict(r) for r in rows]
+
+
+def get_lost_found_by_id(item_id: str):
+    """Finds a lost & found item by its ID."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM lost_and_found WHERE id = ?", (item_id.strip().upper(),))
+    row = cursor.fetchone()
+    conn.close()
+    return lost_found_row_to_dict(row) if row else None
+
+
+def create_lost_found(data: dict) -> dict:
+    """Inserts a new lost or found item into SQLite."""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    item_id = generate_lost_found_id(cursor)
+    now = datetime.now(timezone.utc).isoformat()
+
+    cursor.execute(
+        """
+        INSERT INTO lost_and_found (
+            id, type, title, category, description, location, item_date, contact_name, contact_info, roll_no, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            item_id,
+            data.get("type", "Lost").capitalize(),
+            data["title"].strip(),
+            data.get("category", "Other").strip(),
+            data.get("description", "").strip(),
+            data.get("location", "").strip(),
+            data.get("itemDate", now[:10]).strip(),
+            data.get("contactName", "Student").strip(),
+            data.get("contactInfo", "").strip(),
+            data.get("rollNo", "").strip().upper(),
+            data.get("status", "Open"),
+            now,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    return get_lost_found_by_id(item_id)
+
+
+def update_lost_found_status(item_id: str, new_status: str):
+    """Updates status of a lost & found item (e.g., 'Claimed' or 'Open')."""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM lost_and_found WHERE id = ?", (item_id.strip().upper(),))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+
+    cursor.execute(
+        """
+        UPDATE lost_and_found
+        SET status = ?
+        WHERE id = ?
+        """,
+        (new_status, item_id.strip().upper()),
+    )
+    conn.commit()
+    conn.close()
+
+    return get_lost_found_by_id(item_id)
+
+
+# ---------------------------------------------------------------------------
+# Affiliated Colleges Helpers & Queries
+# ---------------------------------------------------------------------------
+
+def college_row_to_dict(row: sqlite3.Row) -> dict:
+    """Formats an affiliated_colleges DB row into camelCase JSON."""
+    return {
+        "id": row["id"],
+        "code": row["code"],
+        "name": row["name"],
+        "shortName": row["short_name"],
+        "city": row["city"],
+        "state": row["state"],
+        "domain": row["domain"],
+        "status": row["status"],
+        "createdAt": row["created_at"],
+    }
+
+
+def get_all_affiliated_colleges() -> list:
+    """Returns all authorized affiliated colleges."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM affiliated_colleges WHERE status = 'Active' ORDER BY name ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [college_row_to_dict(r) for r in rows]
+
+
+def get_college_by_code(code: str):
+    """Finds an affiliated college by code (e.g. 'MSIT')."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM affiliated_colleges WHERE UPPER(code) = ?", (code.strip().upper(),))
+    row = cursor.fetchone()
+    conn.close()
+    return college_row_to_dict(row) if row else None

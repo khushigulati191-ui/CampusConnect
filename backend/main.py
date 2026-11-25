@@ -63,6 +63,22 @@ class StatusUpdate(BaseModel):
     status: str = Field(..., description="New status: 'Pending', 'In Progress', or 'Resolved'")
 
 
+class LostFoundCreate(BaseModel):
+    type: str = Field("Lost", description="'Lost' or 'Found'")
+    title: str = Field(..., min_length=1, description="Item name / title")
+    category: str = Field("Other", description="Item category (Electronics, Documents, etc.)")
+    description: Optional[str] = Field("", description="Detailed description and identifiable marks")
+    location: str = Field(..., min_length=1, description="Where the item was lost or found")
+    itemDate: Optional[str] = Field("", description="Date when lost or found")
+    contactName: str = Field(..., min_length=1, description="Name of the person reporting")
+    contactInfo: str = Field(..., min_length=1, description="Phone, email or room number")
+    rollNo: Optional[str] = Field("", description="Student roll number")
+
+
+class LostFoundStatusUpdate(BaseModel):
+    status: str = Field(..., description="Status: 'Open' or 'Claimed'")
+
+
 # ---------------------------------------------------------------------------
 # API Routes
 # ---------------------------------------------------------------------------
@@ -162,3 +178,54 @@ def get_priority_queue():
         "highestPriority": pq.peek(),
         "items": pq.to_list(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Lost & Found Endpoints
+# ---------------------------------------------------------------------------
+@app.get("/api/lost-and-found", tags=["Lost & Found"])
+def list_lost_found():
+    """Returns all lost and found items."""
+    return database.get_all_lost_found()
+
+
+@app.post("/api/lost-and-found", status_code=status.HTTP_201_CREATED, tags=["Lost & Found"])
+def report_lost_found(payload: LostFoundCreate):
+    """Submits a new lost or found item report."""
+    created = database.create_lost_found(payload.model_dump())
+    return created
+
+
+@app.patch("/api/lost-and-found/{item_id}/status", tags=["Lost & Found"])
+def update_lost_found_status(item_id: str, payload: LostFoundStatusUpdate):
+    """Updates status of a lost & found item (e.g., 'Claimed')."""
+    updated = database.update_lost_found_status(item_id, payload.status)
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Item with ID '{item_id}' was not found.",
+        )
+    return updated
+
+
+# ---------------------------------------------------------------------------
+# Affiliated Colleges Endpoints
+# ---------------------------------------------------------------------------
+@app.get("/api/colleges", tags=["Colleges"])
+def list_affiliated_colleges():
+    """Returns all authorized affiliated colleges."""
+    return database.get_all_affiliated_colleges()
+
+
+@app.get("/api/colleges/{code}", tags=["Colleges"])
+def get_college(code: str):
+    """Fetches affiliated college details by its code (e.g. 'MSIT')."""
+    college = database.get_college_by_code(code)
+    if not college:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"College '{code}' is not currently affiliated.",
+        )
+    return college
+
+
