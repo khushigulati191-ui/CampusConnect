@@ -38,8 +38,14 @@ export default function AdminDashboard() {
   const [selectedId, setSelectedId] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
-  const pendingComplaints = complaints.filter((c) => c.status === 'Pending');
-  const inProgressComplaints = complaints.filter((c) => c.status === 'In Progress');
+  // Complaints currently under investigation/maintenance work
+  const inProgressComplaints = complaints.filter(
+    (c) => c.status === 'In Progress' || c.status === 'Pending'
+  );
+  // Complaints where work was completed and authority demanded student review
+  const awaitingReviewComplaints = complaints.filter(
+    (c) => c.status === 'Needs Review'
+  );
 
   const handleQuickStatus = async (complaint, newStatus, actionName) => {
     if (busyId) return;
@@ -85,7 +91,7 @@ export default function AdminDashboard() {
               to="/review"
               className="btn rounded-xl bg-amber-500 hover:bg-amber-400 text-ink font-bold px-4 py-2.5 shadow-sm text-xs inline-flex items-center gap-1.5"
             >
-              <ClipboardCheck size={16} /> Open Review Desk ({stats.pending})
+              <ClipboardCheck size={16} /> Open Review Desk ({stats.inProgress})
             </Link>
             <Link
               to="/colleges"
@@ -100,30 +106,30 @@ export default function AdminDashboard() {
       {/* KPI Overview Cards */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Total Received"
+          label="Total Grievances"
           value={loading ? '–' : stats.total}
           hint="From students & staff"
           icon={Inbox}
           tone="bg-brand-50 text-brand-600"
         />
         <StatCard
-          label="Needs Review"
-          value={loading ? '–' : stats.pending}
-          hint={stats.pending > 0 ? 'Requires authority action' : 'All caught up'}
-          icon={Clock}
-          tone="bg-amber-50 text-amber-700"
-        />
-        <StatCard
-          label="Under Maintenance"
+          label="Under Investigation"
           value={loading ? '–' : stats.inProgress}
-          hint="Technicians dispatched"
+          hint={stats.inProgress > 0 ? 'Work currently in progress' : 'No active repairs'}
           icon={Loader}
           tone="bg-sky-50 text-sky-600"
         />
         <StatCard
+          label="Awaiting Student Review"
+          value={loading ? '–' : stats.needsReview}
+          hint={stats.needsReview > 0 ? 'Demanded review from student' : 'None awaiting review'}
+          icon={Clock}
+          tone="bg-amber-50 text-amber-700"
+        />
+        <StatCard
           label="Closed & Resolved"
           value={loading ? '–' : stats.resolved}
-          hint="Verified by administration"
+          hint="Confirmed & closed by student"
           icon={CheckCircle2}
           tone="bg-emerald-50 text-emerald-600"
         />
@@ -131,12 +137,12 @@ export default function AdminDashboard() {
 
       {/* Main Grid: Incoming Complaints Queue + Side Panels */}
       <section className="grid gap-6 lg:grid-cols-3">
-        {/* Left: Incoming Complaints Requiring Review */}
+        {/* Left: Complaints Under Investigation / Requiring Repair */}
         <div className="card overflow-hidden lg:col-span-2">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
             <div>
-              <h2 className="text-lg font-bold text-ink">Urgent Student Complaints (Awaiting Review)</h2>
-              <p className="text-xs text-ink-500">Chronological arrival order from MSIT students</p>
+              <h2 className="text-lg font-bold text-ink">Active Student Complaints (Under Investigation)</h2>
+              <p className="text-xs text-ink-500">Fix issues and demand student review to authorize closure</p>
             </div>
             <Link
               to="/review"
@@ -149,11 +155,11 @@ export default function AdminDashboard() {
           <div className="p-4 sm:p-5">
             {loading ? (
               <SkeletonRows count={4} />
-            ) : pendingComplaints.length === 0 ? (
+            ) : inProgressComplaints.length === 0 ? (
               <EmptyState
                 icon={CheckCircle2}
-                title="No complaints awaiting review!"
-                description="All submitted student grievances have been reviewed and dispatched by authorities."
+                title="All caught up!"
+                description="No student complaints are currently under investigation. Great job!"
                 action={
                   <Link to="/history" className="btn-outline">
                     View Complete Archive
@@ -162,7 +168,7 @@ export default function AdminDashboard() {
               />
             ) : (
               <div className="space-y-3.5">
-                {pendingComplaints.slice(0, 5).map((c) => {
+                {inProgressComplaints.slice(0, 5).map((c) => {
                   const isBusy = busyId === c.id;
                   return (
                     <div
@@ -181,7 +187,11 @@ export default function AdminDashboard() {
                       </div>
 
                       <h3 className="mt-2 text-base font-bold text-ink">{c.title}</h3>
-                      <p className="mt-1 text-xs text-ink-600 line-clamp-2">{c.description}</p>
+                      {c.description ? (
+                        <p className="mt-1 text-xs text-ink-600 line-clamp-2">{c.description}</p>
+                      ) : (
+                        <p className="mt-1 text-xs italic text-ink-400">No additional description provided.</p>
+                      )}
 
                       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs">
                         <div className="flex items-center gap-3 text-ink-500">
@@ -204,20 +214,20 @@ export default function AdminDashboard() {
                           <button
                             type="button"
                             disabled={isBusy}
-                            onClick={() => handleQuickStatus(c, 'In Progress', 'marked under review')}
-                            className="btn-outline text-xs px-2.5 py-1"
+                            onClick={() => handleQuickStatus(c, 'Needs Review', 'marked fixed; demanded review from student')}
+                            className="btn-primary text-xs px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold inline-flex items-center gap-1"
                           >
-                            <Loader size={13} className={isBusy ? 'animate-spin' : ''} />
-                            Start Work
+                            <ClipboardCheck size={13} />
+                            Fix Done → Demand Review
                           </button>
                           <button
                             type="button"
                             disabled={isBusy}
-                            onClick={() => handleQuickStatus(c, 'Resolved', 'closed & resolved')}
-                            className="btn-primary text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-500"
+                            onClick={() => handleQuickStatus(c, 'Resolved', 'direct closed by authority')}
+                            className="btn-outline text-xs px-2.5 py-1 text-ink-500 hover:text-ink"
+                            title="Direct Close (Emergency override)"
                           >
-                            <CheckCircle2 size={13} />
-                            Close
+                            Direct Close
                           </button>
                         </div>
                       </div>

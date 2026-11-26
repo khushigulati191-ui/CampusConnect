@@ -55,12 +55,12 @@ class ComplaintCreate(BaseModel):
     department: str = Field(..., min_length=1, description="Department name")
     category: str = Field(..., min_length=1, description="Issue category")
     title: str = Field(..., min_length=1, description="Summary title of the complaint")
-    description: str = Field(..., min_length=1, description="Detailed description")
+    description: Optional[str] = Field("", description="Detailed description (optional)")
     location: str = Field(..., min_length=1, description="Location where issue occurred")
 
 
 class StatusUpdate(BaseModel):
-    status: str = Field(..., description="New status: 'Pending', 'In Progress', or 'Resolved'")
+    status: str = Field(..., description="New status: 'In Progress', 'Needs Review', or 'Resolved'")
 
 
 class LostFoundCreate(BaseModel):
@@ -116,7 +116,7 @@ def create_complaint(payload: ComplaintCreate):
 @app.patch("/api/complaints/{complaint_id}/status", tags=["Complaints"])
 def update_status(complaint_id: str, payload: StatusUpdate):
     """Updates complaint lifecycle status and appends to the audit timeline."""
-    valid_statuses = {"Pending", "In Progress", "Resolved"}
+    valid_statuses = {"In Progress", "Needs Review", "Resolved", "Pending"}
     if payload.status not in valid_statuses:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -227,5 +227,24 @@ def get_college(code: str):
             detail=f"College '{code}' is not currently affiliated.",
         )
     return college
+
+
+# ---------------------------------------------------------------------------
+# Developer & Users Endpoints
+# ---------------------------------------------------------------------------
+@app.get("/api/users", tags=["Users"])
+def list_users():
+    """Returns all users registered in the system (Riya Sharma, Dr. Rajesh Verma, etc.)."""
+    return database.get_all_users()
+
+
+@app.get("/api/dev/db-overview", tags=["Developer"])
+def get_dev_database_overview():
+    """
+    Developer overview: returns all tables, columns, row counts, and health status
+    of the local SQLite database.
+    """
+    return database.get_database_overview()
+
 
 

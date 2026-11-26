@@ -1,21 +1,25 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  AlertCircle,
+  ArrowRight,
   CheckCircle2,
   Clock,
   ExternalLink,
-  FileCheck2,
   Filter,
   History,
   Loader,
   MapPin,
   RotateCcw,
   Search,
+  Send,
   ShieldCheck,
+  ThumbsUp,
   User,
   X,
 } from 'lucide-react';
 import { CATEGORIES, STATUS } from '../constants';
+import { useAuth } from '../context/AuthContext';
 import { useComplaints } from '../context/ComplaintsContext';
 import { useToast } from '../context/ToastContext';
 import PageHeader from '../components/ui/PageHeader';
@@ -27,22 +31,36 @@ import ComplaintDetails from '../components/complaints/ComplaintDetails';
 import { formatDate, waitingTime } from '../utils/format';
 
 export default function ReviewComplaints() {
+  const { user, isAdmin } = useAuth();
   const { complaints, stats, loading, error, reload, changeStatus } = useComplaints();
   const { notify } = useToast();
 
-  const [tab, setTab] = useState('Pending'); // default to complaints needing review
+  // If student: default to complaints needing their review. If admin: default to active complaints to investigate.
+  const [tab, setTab] = useState(isAdmin ? 'In Progress' : 'Needs Review');
   const [category, setCategory] = useState('All');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
+  // Student's own complaints vs All complaints
+  const userComplaints = useMemo(() => {
+    if (isAdmin) return complaints;
+    return complaints.filter(
+      (c) =>
+        c.rollNo?.toUpperCase() === user?.rollNo?.toUpperCase() ||
+        c.studentName?.toLowerCase() === user?.name?.toLowerCase()
+    );
+  }, [complaints, user, isAdmin]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return complaints
+    const sourceList = isAdmin ? complaints : userComplaints;
+
+    return sourceList
       .filter((c) => {
         if (tab === 'All') return true;
-        if (tab === 'Pending') return c.status === STATUS.PENDING;
-        if (tab === 'In Progress') return c.status === STATUS.IN_PROGRESS;
+        if (tab === 'Needs Review') return c.status === STATUS.NEEDS_REVIEW;
+        if (tab === 'In Progress') return c.status === STATUS.IN_PROGRESS || c.status === 'Pending';
         if (tab === 'Resolved') return c.status === STATUS.RESOLVED;
         return true;
       })
@@ -56,7 +74,7 @@ export default function ReviewComplaints() {
             .includes(q),
       )
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [complaints, tab, category, search]);
+  }, [complaints, userComplaints, tab, category, search, isAdmin]);
 
   const handleUpdateStatus = async (complaint, newStatus, actionName) => {
     if (busyId) return;
@@ -79,76 +97,54 @@ export default function ReviewComplaints() {
     }
   };
 
+  const studentNeedsReviewCount = userComplaints.filter((c) => c.status === STATUS.NEEDS_REVIEW).length;
+  const adminNeedsActionCount = complaints.filter((c) => c.status === STATUS.IN_PROGRESS || c.status === 'Pending').length;
+
   const selected = complaints.find((c) => c.id === selectedId) || null;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Review Complaints"
-        subtitle="Campus authority triage panel: review submitted complaints, investigate issues, and close resolved tickets."
+        title={isAdmin ? 'Authority Review & Dispatch Desk' : 'Review & Confirm Resolution'}
+        subtitle={
+          isAdmin
+            ? 'Investigate campus complaints, solve issues, and demand student review to authorize closure.'
+            : 'When campus maintenance finishes fixing your complaint, review their work here and confirm to close it.'
+        }
         actions={
           <Link to="/history" className="btn-outline">
-            <History size={16} /> View all history
+            <History size={16} /> View complete history
           </Link>
         }
       />
 
-      {/* KPI Overview Tiles */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div
-          onClick={() => setTab('Pending')}
-          className={`card cursor-pointer p-5 transition ${
-            tab === 'Pending' ? 'ring-2 ring-amber-500' : 'hover:shadow-md'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-amber-700">Awaiting Review</p>
-              <p className="mt-1 text-3xl font-extrabold text-ink">{loading ? '–' : stats.pending}</p>
-              <p className="mt-1 text-xs text-ink-500">Needs authority attention</p>
+      {/* Student Urgent Review Callout */}
+      {!isAdmin && studentNeedsReviewCount > 0 && (
+        <div className="rounded-3xl border-2 border-amber-300 bg-amber-50/80 p-5 shadow-sm animate-slide-up">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-amber-500 text-white shadow-sm">
+                <Clock size={22} />
+              </span>
+              <div>
+                <h3 className="text-base font-bold text-amber-900">
+                  {studentNeedsReviewCount} {studentNeedsReviewCount === 1 ? 'Complaint' : 'Complaints'} Awaiting Your Review!
+                </h3>
+                <p className="mt-0.5 text-xs text-amber-800 leading-relaxed">
+                  Campus maintenance has completed the required repairs. Please verify if the issue has been resolved satisfactorily and close the complaint.
+                </p>
+              </div>
             </div>
-            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-amber-100 text-amber-700">
-              <Clock size={24} />
-            </span>
+            <button
+              type="button"
+              onClick={() => setTab('Needs Review')}
+              className="btn bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl px-4 py-2 shrink-0 self-start sm:self-auto shadow-sm"
+            >
+              Review Now
+            </button>
           </div>
         </div>
-
-        <div
-          onClick={() => setTab('In Progress')}
-          className={`card cursor-pointer p-5 transition ${
-            tab === 'In Progress' ? 'ring-2 ring-sky-500' : 'hover:shadow-md'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-sky-700">Under Investigation</p>
-              <p className="mt-1 text-3xl font-extrabold text-ink">{loading ? '–' : stats.inProgress}</p>
-              <p className="mt-1 text-xs text-ink-500">Work in progress</p>
-            </div>
-            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-sky-100 text-sky-700">
-              <Loader size={24} />
-            </span>
-          </div>
-        </div>
-
-        <div
-          onClick={() => setTab('Resolved')}
-          className={`card cursor-pointer p-5 transition ${
-            tab === 'Resolved' ? 'ring-2 ring-emerald-500' : 'hover:shadow-md'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Closed & Resolved</p>
-              <p className="mt-1 text-3xl font-extrabold text-ink">{loading ? '–' : stats.resolved}</p>
-              <p className="mt-1 text-xs text-ink-500">Completed & verified</p>
-            </div>
-            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-100 text-emerald-700">
-              <CheckCircle2 size={24} />
-            </span>
-          </div>
-        </div>
-      </section>
+      )}
 
       {/* Main Review Section */}
       <div className="card overflow-hidden">
@@ -162,8 +158,7 @@ export default function ReviewComplaints() {
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by ID, title, student name, roll no, location…"
-                aria-label="Search review complaints"
+                placeholder="Search complaints by title, ID, location…"
                 className="input pl-10"
               />
             </div>
@@ -191,10 +186,31 @@ export default function ReviewComplaints() {
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <div className="flex flex-wrap gap-2">
               {[
-                { key: 'Pending', label: 'Needs Review', count: stats.pending },
-                { key: 'In Progress', label: 'In Progress', count: stats.inProgress },
-                { key: 'Resolved', label: 'Closed / Resolved', count: stats.resolved },
-                { key: 'All', label: 'All Complaints', count: stats.total },
+                {
+                  key: 'Needs Review',
+                  label: isAdmin ? 'Awaiting Student Review' : 'Needs My Review',
+                  count: isAdmin
+                    ? complaints.filter((c) => c.status === STATUS.NEEDS_REVIEW).length
+                    : studentNeedsReviewCount,
+                  highlight: true,
+                },
+                {
+                  key: 'In Progress',
+                  label: isAdmin ? 'Under Investigation (Fix in Progress)' : 'In Progress (Campus Fixing)',
+                  count: isAdmin
+                    ? adminNeedsActionCount
+                    : userComplaints.filter((c) => c.status === STATUS.IN_PROGRESS || c.status === 'Pending').length,
+                },
+                {
+                  key: 'Resolved',
+                  label: 'Closed & Resolved',
+                  count: (isAdmin ? complaints : userComplaints).filter((c) => c.status === STATUS.RESOLVED).length,
+                },
+                {
+                  key: 'All',
+                  label: 'All Tickets',
+                  count: (isAdmin ? complaints : userComplaints).length,
+                },
               ].map((t) => (
                 <button
                   key={t.key}
@@ -202,7 +218,9 @@ export default function ReviewComplaints() {
                   onClick={() => setTab(t.key)}
                   className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
                     tab === t.key
-                      ? 'bg-ink text-white'
+                      ? 'bg-ink text-white shadow-sm'
+                      : t.highlight && t.count > 0
+                      ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
                       : 'bg-slate-100 text-ink-600 hover:bg-slate-200'
                   }`}
                 >
@@ -210,7 +228,11 @@ export default function ReviewComplaints() {
                   {!loading && (
                     <span
                       className={`grid h-5 min-w-[1.25rem] place-items-center rounded-full px-1 text-[11px] font-bold ${
-                        tab === t.key ? 'bg-white/20 text-white' : 'bg-slate-200 text-ink-700'
+                        tab === t.key
+                          ? 'bg-white/20 text-white'
+                          : t.highlight && t.count > 0
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-slate-200 text-ink-700'
                       }`}
                     >
                       {t.count}
@@ -235,11 +257,17 @@ export default function ReviewComplaints() {
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={ShieldCheck}
-              title={tab === 'Pending' ? 'No complaints awaiting review!' : 'No matching complaints found'}
+              title={
+                tab === 'Needs Review'
+                  ? 'No complaints currently awaiting review'
+                  : 'No complaints in this view'
+              }
               description={
-                tab === 'Pending'
-                  ? 'All submitted complaints have been reviewed by authorities. Excellent work!'
-                  : 'Try selecting a different tab or clearing your search filters.'
+                tab === 'Needs Review'
+                  ? isAdmin
+                    ? 'No complaints are currently pending student review. Complete active fixes to request student verification.'
+                    : 'None of your complaints currently require review. When campus authorities finish a repair, it will appear here for you to verify and close.'
+                  : 'Try selecting a different status tab or clearing filters.'
               }
               action={
                 search || category !== 'All' ? (
@@ -260,10 +288,16 @@ export default function ReviewComplaints() {
             <div className="space-y-4">
               {filtered.map((c) => {
                 const isBusy = busyId === c.id;
+                const isAwaitingStudentReview = c.status === STATUS.NEEDS_REVIEW;
+
                 return (
                   <article
                     key={c.id}
-                    className="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-card"
+                    className={`relative rounded-2xl border p-5 shadow-sm transition ${
+                      isAwaitingStudentReview
+                        ? 'border-amber-300 bg-amber-50/20 shadow-md ring-1 ring-amber-300/60'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
                   >
                     {/* Top Row: Meta & Badges */}
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -273,16 +307,20 @@ export default function ReviewComplaints() {
                         <StatusBadge status={c.status} />
                       </div>
                       <span className="text-xs text-ink-500">
-                        Submitted {waitingTime(c.createdAt)} ago ({formatDate(c.createdAt)})
+                        Registered {waitingTime(c.createdAt)} ago ({formatDate(c.createdAt)})
                       </span>
                     </div>
 
                     {/* Content */}
                     <div className="mt-3">
                       <h3 className="text-lg font-bold text-ink">{c.title}</h3>
-                      <p className="mt-1.5 text-sm text-ink-600 leading-relaxed whitespace-pre-line">
-                        {c.description}
-                      </p>
+                      {c.description ? (
+                        <p className="mt-1.5 text-sm text-ink-600 leading-relaxed whitespace-pre-line">
+                          {c.description}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs italic text-ink-400">No additional description provided.</p>
+                      )}
                     </div>
 
                     {/* Student & Location Info Row */}
@@ -297,81 +335,108 @@ export default function ReviewComplaints() {
                       </span>
                     </div>
 
-                    {/* Authority Action Footer */}
+                    {/* Authority & Student Interactive Action Footer */}
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
                       <button
                         type="button"
                         onClick={() => setSelectedId(c.id)}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:underline"
                       >
-                        <ExternalLink size={14} /> View full history & timeline
+                        <ExternalLink size={14} /> View full timeline & history
                       </button>
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        {/* Pending Actions */}
-                        {c.status === STATUS.PENDING && (
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        {/* 1. STUDENT REVIEW WORKFLOW */}
+                        {!isAdmin && (
                           <>
-                            <button
-                              type="button"
-                              disabled={isBusy}
-                              onClick={() => handleUpdateStatus(c, STATUS.IN_PROGRESS, 'marked under review')}
-                              className="btn-outline text-xs px-3 py-1.5"
-                            >
-                              <Loader size={14} className={isBusy ? 'animate-spin' : ''} />
-                              Mark Under Review
-                            </button>
-                            <button
-                              type="button"
-                              disabled={isBusy}
-                              onClick={() => handleUpdateStatus(c, STATUS.RESOLVED, 'closed & resolved')}
-                              className="btn-primary text-xs px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500"
-                            >
-                              <CheckCircle2 size={14} />
-                              Close & Resolve
-                            </button>
+                            {c.status === STATUS.NEEDS_REVIEW && (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => handleUpdateStatus(c, STATUS.IN_PROGRESS, 'reopened (issue persists)')}
+                                  className="btn-outline text-xs px-3 py-1.5 text-amber-700 border-amber-300 hover:bg-amber-50"
+                                >
+                                  <RotateCcw size={14} />
+                                  Issue Still Persists (Reopen)
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => handleUpdateStatus(c, STATUS.RESOLVED, 'confirmed fixed and closed')}
+                                  className="btn-primary text-xs px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-sm inline-flex items-center gap-1.5"
+                                >
+                                  <CheckCircle2 size={15} />
+                                  Confirm Fixed & Close Complaint
+                                </button>
+                              </>
+                            )}
+
+                            {c.status === STATUS.IN_PROGRESS && (
+                              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-700 bg-sky-50 px-3 py-1.5 rounded-xl border border-sky-200">
+                                <Loader size={13} className="animate-spin text-sky-600" />
+                                Under Active Investigation by Campus Authorities
+                              </span>
+                            )}
+
+                            {c.status === STATUS.RESOLVED && (
+                              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                                <CheckCircle2 size={14} />
+                                Complaint Closed & Resolved
+                              </span>
+                            )}
                           </>
                         )}
 
-                        {/* In Progress Actions */}
-                        {c.status === STATUS.IN_PROGRESS && (
+                        {/* 2. ADMIN AUTHORITY WORKFLOW */}
+                        {isAdmin && (
                           <>
-                            <button
-                              type="button"
-                              disabled={isBusy}
-                              onClick={() => handleUpdateStatus(c, STATUS.PENDING, 'returned to pending')}
-                              className="btn-ghost text-xs px-3 py-1.5 text-ink-500 hover:text-ink"
-                            >
-                              <RotateCcw size={14} />
-                              Revert to Pending
-                            </button>
-                            <button
-                              type="button"
-                              disabled={isBusy}
-                              onClick={() => handleUpdateStatus(c, STATUS.RESOLVED, 'closed & resolved')}
-                              className="btn-primary text-xs px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500"
-                            >
-                              <CheckCircle2 size={14} />
-                              Close & Resolve
-                            </button>
-                          </>
-                        )}
+                            {(c.status === STATUS.IN_PROGRESS || c.status === 'Pending') && (
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => handleUpdateStatus(c, STATUS.NEEDS_REVIEW, 'marked solved; demanded student review')}
+                                className="btn-primary text-xs px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold shadow-sm inline-flex items-center gap-1.5"
+                              >
+                                <Send size={14} />
+                                Fix Completed → Demand Student Review
+                              </button>
+                            )}
 
-                        {/* Resolved Actions */}
-                        {c.status === STATUS.RESOLVED && (
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
-                              <CheckCircle2 size={14} /> Closed by Authority
-                            </span>
-                            <button
-                              type="button"
-                              disabled={isBusy}
-                              onClick={() => handleUpdateStatus(c, STATUS.IN_PROGRESS, 're-opened')}
-                              className="btn-outline text-xs px-2.5 py-1 text-ink-600"
-                              title="Re-open this complaint if issue persists"
-                            >
-                              <RotateCcw size={13} /> Re-open
-                            </button>
-                          </div>
+                            {c.status === STATUS.NEEDS_REVIEW && (
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
+                                  <Clock size={13} />
+                                  Awaiting Student Confirmation & Closure
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => handleUpdateStatus(c, STATUS.RESOLVED, 'force-closed by authority')}
+                                  className="btn-outline text-xs px-2.5 py-1 text-ink-600 hover:text-ink"
+                                  title="Close directly as authority"
+                                >
+                                  Direct Close
+                                </button>
+                              </div>
+                            )}
+
+                            {c.status === STATUS.RESOLVED && (
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
+                                  <CheckCircle2 size={14} /> Confirmed Closed
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => handleUpdateStatus(c, STATUS.IN_PROGRESS, 're-opened by authority')}
+                                  className="btn-outline text-xs px-2.5 py-1 text-ink-600"
+                                >
+                                  <RotateCcw size={13} /> Re-open
+                                </button>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -384,7 +449,7 @@ export default function ReviewComplaints() {
       </div>
 
       {/* Details Drawer */}
-      <Drawer open={Boolean(selected)} onClose={() => setSelectedId(null)} title="Complaint Details & Audit">
+      <Drawer open={Boolean(selected)} onClose={() => setSelectedId(null)} title="Complaint Details & Timeline">
         {selected && <ComplaintDetails complaint={selected} />}
       </Drawer>
     </div>

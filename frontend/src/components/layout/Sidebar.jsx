@@ -111,10 +111,12 @@ export default function Sidebar({ open, onClose }) {
                     <Icon size={18} />
                   </span>
                   <span className="flex-1">{label}</span>
-                  {showPendingCount && stats.pending > 0 && (
-                    <span className="grid min-w-[1.5rem] place-items-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold text-white">
-                      {stats.pending}
-                    </span>
+                  {showPendingCount && (
+                    (isAdmin ? stats.inProgress : stats.needsReview) > 0 && (
+                      <span className="grid min-w-[1.5rem] place-items-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold text-white">
+                        {isAdmin ? stats.inProgress : stats.needsReview}
+                      </span>
+                    )
                   )}
                 </>
               )}

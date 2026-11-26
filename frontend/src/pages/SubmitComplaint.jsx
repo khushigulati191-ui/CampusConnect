@@ -48,9 +48,10 @@ function validate(values) {
   if (!title) errors.title = 'Complaint title is required.';
   else if (title.length < 5) errors.title = 'Title should be at least 5 characters.';
 
-  if (!description) errors.description = 'Please describe the problem.';
-  else if (description.length < 20)
-    errors.description = `Add a little more detail (${description.length}/20 characters minimum).`;
+  // Description is optional
+  if (description && description.length > LIMITS.description) {
+    errors.description = `Description exceeds ${LIMITS.description} characters limit.`;
+  }
 
   if (!location) errors.location = 'Location / building / room number is required.';
 
@@ -282,14 +283,15 @@ export default function SubmitComplaint() {
               <Field
                 label="Detailed description"
                 htmlFor="description"
+                required={false}
                 error={showError('description')}
-                hint={`${values.description.length}/${LIMITS.description} characters`}
+                hint="Optional"
               >
                 <textarea
                   {...inputProps('description')}
-                  rows={5}
+                  rows={4}
                   maxLength={LIMITS.description}
-                  placeholder="Describe what happened, when it started and how it affects you…"
+                  placeholder="Optional: Add extra details, room context, or when the issue started…"
                   className={`input resize-y ${showError('description') ? 'input-error' : ''}`}
                 />
               </Field>

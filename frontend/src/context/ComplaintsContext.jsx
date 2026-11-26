@@ -44,10 +44,19 @@ export function ComplaintsProvider({ children }) {
   const fifo = useMemo(() => [...complaints].sort(byOldestFirst), [complaints]);
 
   const stats = useMemo(() => {
-    const pending = complaints.filter((c) => c.status === STATUS.PENDING).length;
-    const inProgress = complaints.filter((c) => c.status === STATUS.IN_PROGRESS).length;
+    const inProgress = complaints.filter(
+      (c) => c.status === STATUS.IN_PROGRESS || c.status === 'Pending'
+    ).length;
+    const needsReview = complaints.filter((c) => c.status === STATUS.NEEDS_REVIEW).length;
     const resolved = complaints.filter((c) => c.status === STATUS.RESOLVED).length;
-    return { total: complaints.length, pending, inProgress, resolved, active: pending + inProgress };
+    return {
+      total: complaints.length,
+      inProgress,
+      needsReview,
+      pending: needsReview, // alias for backwards compatibility
+      resolved,
+      active: inProgress + needsReview,
+    };
   }, [complaints]);
 
   const value = useMemo(

@@ -100,13 +100,13 @@ const mock = {
       department: payload.department,
       category: payload.category,
       title: payload.title.trim(),
-      description: payload.description.trim(),
+      description: payload.description ? payload.description.trim() : '',
       location: payload.location.trim(),
-      status: STATUS.PENDING,
+      status: STATUS.IN_PROGRESS,
       createdAt: now,
       updatedAt: now,
       timeline: [
-        { status: STATUS.PENDING, at: now, note: 'Complaint submitted and registered in CampusConnect.' },
+        { status: STATUS.IN_PROGRESS, at: now, note: 'Complaint registered and assigned to campus authority.' },
       ],
     };
     writeStore([...list, complaint]);
@@ -120,9 +120,10 @@ const mock = {
     if (index === -1) throw new ApiError('Complaint not found', 404);
     const now = new Date().toISOString();
     const notes = {
-      [STATUS.PENDING]: 'Complaint moved back to pending status.',
-      [STATUS.IN_PROGRESS]: 'Under review by authority. Assigned to the maintenance team.',
-      [STATUS.RESOLVED]: 'Issue reviewed and closed by campus authority.',
+      [STATUS.IN_PROGRESS]: 'Under investigation & repair by campus authority.',
+      [STATUS.NEEDS_REVIEW]: 'Campus authority completed work and requested student review & confirmation.',
+      [STATUS.RESOLVED]: 'Student confirmed resolution and closed the complaint.',
+      [STATUS.PENDING]: 'Complaint moved to in progress status.',
     };
     const updated = {
       ...list[index],

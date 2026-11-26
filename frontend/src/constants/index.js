@@ -47,28 +47,19 @@ export const DEPARTMENTS = [
 ];
 
 export const STATUS = {
-  PENDING: 'Pending',
   IN_PROGRESS: 'In Progress',
+  NEEDS_REVIEW: 'Needs Review',
   RESOLVED: 'Resolved',
+  PENDING: 'In Progress',
 };
 
 /** Order matters: it is the lifecycle of a complaint. */
-export const STATUS_FLOW = [STATUS.PENDING, STATUS.IN_PROGRESS, STATUS.RESOLVED];
+export const STATUS_FLOW = [STATUS.IN_PROGRESS, STATUS.NEEDS_REVIEW, STATUS.RESOLVED];
 
 export const STATUS_META = {
-  [STATUS.PENDING]: {
-    label: 'Pending',
-    queueLabel: 'Waiting',
-    icon: Clock,
-    pill: 'bg-amber-50 text-amber-700 ring-amber-200',
-    dot: 'bg-amber-500',
-    solid: 'bg-amber-500 text-white',
-    soft: 'bg-amber-50 text-amber-600',
-    bar: 'bg-amber-400',
-  },
   [STATUS.IN_PROGRESS]: {
     label: 'In Progress',
-    queueLabel: 'Processing',
+    studentLabel: 'Under Investigation',
     icon: Loader,
     pill: 'bg-sky-50 text-sky-700 ring-sky-200',
     dot: 'bg-sky-500',
@@ -76,15 +67,35 @@ export const STATUS_META = {
     soft: 'bg-sky-50 text-sky-600',
     bar: 'bg-sky-500',
   },
+  [STATUS.NEEDS_REVIEW]: {
+    label: 'Needs Review',
+    studentLabel: 'Needs Your Review',
+    icon: Clock,
+    pill: 'bg-amber-50 text-amber-700 ring-amber-300 ring-1',
+    dot: 'bg-amber-500',
+    solid: 'bg-amber-500 text-white',
+    soft: 'bg-amber-50 text-amber-600',
+    bar: 'bg-amber-400',
+  },
   [STATUS.RESOLVED]: {
     label: 'Resolved',
-    queueLabel: 'Served',
+    studentLabel: 'Closed & Resolved',
     icon: CheckCircle2,
     pill: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
     dot: 'bg-emerald-500',
     solid: 'bg-emerald-500 text-white',
     soft: 'bg-emerald-50 text-emerald-600',
     bar: 'bg-emerald-500',
+  },
+  Pending: {
+    label: 'In Progress',
+    studentLabel: 'Under Investigation',
+    icon: Loader,
+    pill: 'bg-sky-50 text-sky-700 ring-sky-200',
+    dot: 'bg-sky-500',
+    solid: 'bg-sky-500 text-white',
+    soft: 'bg-sky-50 text-sky-600',
+    bar: 'bg-sky-500',
   },
 };
 

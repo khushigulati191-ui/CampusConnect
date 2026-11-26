@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -29,6 +29,18 @@ export default function Topbar({ onMenuClick }) {
   const { user, isAuthenticated, logout, switchRole, isAdmin } = useAuth();
   const { stats, complaints } = useComplaints();
   const { notify } = useToast();
+
+  const reviewBadgeCount = isAdmin ? stats.inProgress : stats.needsReview;
+
+  // Close modal on Escape key press
+  useEffect(() => {
+    if (!showProfile) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setShowProfile(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showProfile]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -94,12 +106,12 @@ export default function Topbar({ onMenuClick }) {
         <div className="ml-auto flex items-center gap-3">
           <Link
             to="/review"
-            aria-label={`Open review, ${stats.pending} complaints pending`}
+            aria-label={`Open review, ${reviewBadgeCount} complaints`}
             title="Review Complaints"
             className="relative grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-ink transition hover:bg-slate-50"
           >
             <Bell size={18} />
-            {stats.pending > 0 && (
+            {reviewBadgeCount > 0 && (
               <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white" />
             )}
           </Link>
@@ -146,9 +158,12 @@ export default function Topbar({ onMenuClick }) {
       {/* Profile Modal - Using createPortal directly to document.body for dead-center positioning! */}
       {showProfile && user &&
         createPortal(
-          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-ink/60 backdrop-blur-sm animate-fade-in">
+          <div
+            className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-ink/60 backdrop-blur-sm animate-fade-in"
+            onClick={() => setShowProfile(false)}
+          >
             <div
-              className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+              className="relative my-auto w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}

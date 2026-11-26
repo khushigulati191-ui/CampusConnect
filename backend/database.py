@@ -76,6 +76,22 @@ def init_db():
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            role TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            roll_no TEXT,
+            emp_id TEXT,
+            department TEXT NOT NULL,
+            designation TEXT,
+            college_code TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()
 
     # Seed MSIT as the test case affiliated college if empty
@@ -100,6 +116,46 @@ def init_db():
                 "Active",
                 now,
             ),
+        )
+        conn.commit()
+
+    # Seed developer & sample users if empty
+    cursor.execute("SELECT COUNT(*) FROM users")
+    if cursor.fetchone()[0] == 0:
+        now = datetime.now(timezone.utc).isoformat()
+        users_seed = [
+            (
+                "USR-STU-01",
+                "Riya Sharma",
+                "student",
+                "riya.sharma@campusconnect.edu",
+                "22CS1042",
+                None,
+                "Computer Science",
+                "B.Tech Student (3rd Year)",
+                "MSIT",
+                now,
+            ),
+            (
+                "USR-ADM-01",
+                "Dr. Rajesh Verma",
+                "admin",
+                "dean.admin@msit.in",
+                None,
+                "MSIT-ADM-042",
+                "Campus Administration",
+                "Chief Grievance Officer & Dean",
+                "MSIT",
+                now,
+            ),
+        ]
+        cursor.executemany(
+            """
+            INSERT INTO users (
+                id, name, role, email, roll_no, emp_id, department, designation, college_code, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            users_seed,
         )
         conn.commit()
 
@@ -172,9 +228,9 @@ def create_complaint(data: dict) -> dict:
 
     initial_timeline = [
         {
-            "status": "Pending",
+            "status": "In Progress",
             "at": now,
-            "note": "Complaint submitted and registered in CampusConnect.",
+            "note": "Complaint registered in MSIT CampusConnect portal. Sent to campus authority for investigation.",
         }
     ]
 
@@ -191,9 +247,9 @@ def create_complaint(data: dict) -> dict:
             data["department"].strip(),
             data["category"].strip(),
             data["title"].strip(),
-            data["description"].strip(),
+            data.get("description", "").strip(),
             data["location"].strip(),
-            "Pending",
+            "In Progress",
             now,
             now,
             json.dumps(initial_timeline),
@@ -220,9 +276,10 @@ def update_complaint_status(complaint_id: str, new_status: str):
     timeline = json.loads(row["timeline"]) if row["timeline"] else []
 
     status_notes = {
-        "Pending": "Complaint moved back to pending status.",
-        "In Progress": "Under review by authority. Assigned to the maintenance team.",
-        "Resolved": "Issue reviewed and closed by campus authority.",
+        "In Progress": "Under investigation & maintenance work by campus authority.",
+        "Needs Review": "Work completed by campus authority. Review requested from student to verify and close.",
+        "Resolved": "Verified and closed by student.",
+        "Pending": "Complaint placed on hold / queued.",
     }
     note = status_notes.get(new_status, f"Status updated to {new_status}.")
     timeline.append({"status": new_status, "at": now, "note": note})
@@ -394,3 +451,70 @@ def get_college_by_code(code: str):
     row = cursor.fetchone()
     conn.close()
     return college_row_to_dict(row) if row else None
+
+
+# ---------------------------------------------------------------------------
+# Users Helpers & Queries
+# ---------------------------------------------------------------------------
+
+def user_row_to_dict(row: sqlite3.Row) -> dict:
+    """Formats a users DB row into camelCase JSON."""
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "role": row["role"],
+        "email": row["email"],
+        "rollNo": row["roll_no"],
+        "empId": row["emp_id"],
+        "department": row["department"],
+        "designation": row["designation"],
+        "collegeCode": row["college_code"],
+        "createdAt": row["created_at"],
+    }
+
+
+def get_all_users() -> list:
+    """Returns all registered users in the database."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users ORDER BY role DESC, name ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [user_row_to_dict(r) for r in rows]
+
+
+def get_user_by_id(user_id: str):
+    """Finds a user by ID."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id.strip(),))
+    row = cursor.fetchone()
+    conn.close()
+    return user_row_to_dict(row) if row else None
+
+
+def get_database_overview() -> dict:
+    """Returns database schema information, table names, and row counts for developers."""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+    tables = [row["name"] for row in cursor.fetchall()]
+
+    overview = {}
+    for table in tables:
+        cursor.execute(f"SELECT COUNT(*) FROM {table}")
+        count = cursor.fetchone()[0]
+        cursor.execute(f"PRAGMA table_info({table})")
+        columns = [{"name": c["name"], "type": c["type"]} for c in cursor.fetchall()]
+        overview[table] = {
+            "rowCount": count,
+            "columns": columns,
+        }
+
+    conn.close()
+    return {
+        "database": "campus_connect.db",
+        "tables": overview,
+    }
+

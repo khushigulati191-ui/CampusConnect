@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Calendar,
   CheckCircle2,
+  Clock,
   Filter,
   Inbox,
   MapPin,
@@ -9,12 +10,14 @@ import {
   PackageSearch,
   Plus,
   Phone,
+  RotateCcw,
   Search,
+  Send,
   Tag,
   User,
   X,
 } from 'lucide-react';
-import { CURRENT_USER } from '../constants';
+import { useAuth } from '../context/AuthContext';
 import { lostFoundService } from '../services/lostFoundService';
 import { useToast } from '../context/ToastContext';
 import PageHeader from '../components/ui/PageHeader';
@@ -34,6 +37,7 @@ const LF_CATEGORIES = [
 ];
 
 export default function LostAndFound() {
+  const { user, isAdmin } = useAuth();
   const { notify } = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,10 +58,22 @@ export default function LostAndFound() {
     description: '',
     location: '',
     itemDate: new Date().toISOString().slice(0, 10),
-    contactName: CURRENT_USER.name,
-    contactInfo: '',
-    rollNo: CURRENT_USER.rollNo,
+    contactName: user?.name || '',
+    contactInfo: user?.email || '',
+    rollNo: user?.rollNo || user?.empId || '',
   });
+
+  // Keep form defaults in sync if user changes
+  useEffect(() => {
+    if (user) {
+      setForm((prev) => ({
+        ...prev,
+        contactName: prev.contactName || user.name || '',
+        contactInfo: prev.contactInfo || user.email || '',
+        rollNo: prev.rollNo || user.rollNo || user.empId || '',
+      }));
+    }
+  }, [user]);
 
   const loadItems = async () => {
     setLoading(true);
@@ -100,9 +116,9 @@ export default function LostAndFound() {
         description: '',
         location: '',
         itemDate: new Date().toISOString().slice(0, 10),
-        contactName: CURRENT_USER.name,
-        contactInfo: '',
-        rollNo: CURRENT_USER.rollNo,
+        contactName: user?.name || '',
+        contactInfo: user?.email || '',
+        rollNo: user?.rollNo || user?.empId || '',
       });
     } catch (err) {
       notify({ type: 'error', title: 'Failed to submit', message: err.message || 'An error occurred.' });
@@ -120,7 +136,7 @@ export default function LostAndFound() {
       notify({
         type: 'success',
         title: 'Status updated',
-        message: `Item marked as ${newStatus}.`,
+        message: `Item status updated to ${newStatus}.`,
       });
     } catch (err) {
       notify({ type: 'error', title: 'Update failed', message: err.message });
@@ -130,12 +146,15 @@ export default function LostAndFound() {
   // Filtered items
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const userRoll = user?.rollNo || user?.empId || '';
+    const userName = user?.name || '';
+
     return items
       .filter((item) => {
         if (typeFilter === 'My') {
           return (
-            item.rollNo?.toUpperCase() === CURRENT_USER.rollNo.toUpperCase() ||
-            item.contactName?.toLowerCase() === CURRENT_USER.name.toLowerCase()
+            (userRoll && item.rollNo?.toUpperCase() === userRoll.toUpperCase()) ||
+            (userName && item.contactName?.toLowerCase() === userName.toLowerCase())
           );
         }
         if (typeFilter === 'Lost') return item.type === 'Lost';
@@ -150,18 +169,20 @@ export default function LostAndFound() {
           .toLowerCase()
           .includes(q);
       });
-  }, [items, typeFilter, categoryFilter, search]);
+  }, [items, typeFilter, categoryFilter, search, user]);
 
   const counts = useMemo(() => {
+    const userRoll = user?.rollNo || user?.empId || '';
+    const userName = user?.name || '';
     const lost = items.filter((i) => i.type === 'Lost' && i.status !== 'Claimed').length;
     const found = items.filter((i) => i.type === 'Found' && i.status !== 'Claimed').length;
     const my = items.filter(
       (i) =>
-        i.rollNo?.toUpperCase() === CURRENT_USER.rollNo.toUpperCase() ||
-        i.contactName?.toLowerCase() === CURRENT_USER.name.toLowerCase()
+        (userRoll && i.rollNo?.toUpperCase() === userRoll.toUpperCase()) ||
+        (userName && i.contactName?.toLowerCase() === userName.toLowerCase())
     ).length;
     return { lost, found, total: items.length, my };
-  }, [items]);
+  }, [items, user]);
 
   return (
     <div className="space-y-6">
@@ -338,11 +359,16 @@ export default function LostAndFound() {
               {filtered.map((item) => {
                 const isLost = item.type === 'Lost';
                 const isClaimed = item.status === 'Claimed';
+                const isNeedsReview = item.status === 'Needs Review';
 
                 return (
                   <div
                     key={item.id}
-                    className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-card"
+                    className={`flex flex-col justify-between rounded-2xl border p-5 shadow-sm transition hover:shadow-card ${
+                      isNeedsReview
+                        ? 'border-amber-300 bg-amber-50/20 ring-1 ring-amber-300'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
                   >
                     <div>
                       {/* Top Badges */}
@@ -361,10 +387,16 @@ export default function LostAndFound() {
                           className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
                             isClaimed
                               ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-amber-100 text-amber-800'
+                              : isNeedsReview
+                              ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300'
+                              : 'bg-sky-100 text-sky-800'
                           }`}
                         >
-                          {isClaimed ? 'Resolved / Claimed' : 'Active'}
+                          {isClaimed
+                            ? 'Resolved / Claimed'
+                            : isNeedsReview
+                            ? 'Awaiting Verification'
+                            : 'Active'}
                         </span>
                       </div>
 
@@ -402,25 +434,59 @@ export default function LostAndFound() {
                         </p>
                       </div>
 
-                      <div className="mt-3 flex items-center justify-between">
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                         <span className="font-mono text-[11px] text-ink-400">{item.id}</span>
-                        {!isClaimed ? (
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(item.id, 'Claimed')}
-                            className="btn-outline text-xs px-2.5 py-1 text-emerald-700 hover:bg-emerald-50"
-                          >
-                            <CheckCircle2 size={13} /> Mark as Claimed
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(item.id, 'Open')}
-                            className="text-xs text-ink-400 hover:text-ink hover:underline"
-                          >
-                            Re-open
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {isNeedsReview && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(item.id, 'Open')}
+                                className="btn-outline text-xs px-2 py-1 text-ink-500 hover:text-ink"
+                                title="Not verified, re-open item"
+                              >
+                                Re-open
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(item.id, 'Claimed')}
+                                className="btn-primary text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                              >
+                                <CheckCircle2 size={13} /> Confirm & Close
+                              </button>
+                            </>
+                          )}
+
+                          {!isClaimed && !isNeedsReview && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(item.id, 'Needs Review')}
+                                className="btn-outline text-xs px-2 py-1 text-amber-700 border-amber-300 hover:bg-amber-50"
+                                title="Claim initiated or item handed over, demand owner verification"
+                              >
+                                Request Review
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(item.id, 'Claimed')}
+                                className="btn-primary text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                              >
+                                <CheckCircle2 size={13} /> Close
+                              </button>
+                            </>
+                          )}
+
+                          {isClaimed && (
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(item.id, 'Open')}
+                              className="text-xs text-ink-400 hover:text-ink hover:underline"
+                            >
+                              Re-open
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
