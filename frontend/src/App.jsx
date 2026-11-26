@@ -8,12 +8,13 @@ import ComplaintHistory from './pages/ComplaintHistory';
 import ReviewComplaints from './pages/ReviewComplaints';
 import LostAndFound from './pages/LostAndFound';
 import AffiliatedColleges from './pages/AffiliatedColleges';
+import TestConsole from './pages/TestConsole';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
 import { useAuth } from './context/AuthContext';
 
 export default function App() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isTestMode } = useAuth();
 
   return (
     <Routes>
@@ -22,8 +23,25 @@ export default function App() {
 
       {/* Main Authenticated Layout */}
       <Route element={<AppLayout />}>
+        {/* Default Landing: separated by role */}
         <Route index element={isAdmin ? <AdminDashboard /> : <Dashboard />} />
-        <Route path="admin" element={<AdminDashboard />} />
+
+        {/* Dedicated Developer Test URL: /test */}
+        <Route path="test" element={<TestConsole />} />
+
+        {/* Admin Portal (Protected: only accessible to admin or when in /test mode) */}
+        <Route
+          path="admin"
+          element={
+            isAdmin || isTestMode ? (
+              <AdminDashboard />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+
+        {/* Student & Shared Features */}
         <Route path="submit" element={<SubmitComplaint />} />
         <Route path="track" element={<TrackComplaint />} />
         <Route path="review" element={<ReviewComplaints />} />

@@ -53,6 +53,37 @@ export function AuthProvider({ children }) {
     return DEMO_STUDENT; // default to student for initial render
   });
 
+  const [isTestMode, setIsTestMode] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const hasUrlTest =
+          window.location.pathname.startsWith('/test') ||
+          window.location.search.includes('test=true');
+        if (hasUrlTest) return true;
+        return window.localStorage.getItem('campusconnect:test_mode') === 'true';
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    try {
+      if (isTestMode) {
+        window.localStorage.setItem('campusconnect:test_mode', 'true');
+      } else {
+        window.localStorage.removeItem('campusconnect:test_mode');
+      }
+    } catch {
+      // ignore
+    }
+  }, [isTestMode]);
+
+  const enableTestMode = () => setIsTestMode(true);
+  const disableTestMode = () => setIsTestMode(false);
+  const toggleTestMode = () => setIsTestMode((prev) => !prev);
+
   useEffect(() => {
     try {
       if (user) {
@@ -92,6 +123,10 @@ export function AuthProvider({ children }) {
     isAuthenticated: Boolean(user),
     colleges: AFFILIATED_COLLEGES,
     activeCollege: AFFILIATED_COLLEGES[0],
+    isTestMode,
+    enableTestMode,
+    disableTestMode,
+    toggleTestMode,
     loginAsStudent,
     loginAsAdmin,
     login,

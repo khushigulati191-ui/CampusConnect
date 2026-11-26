@@ -26,7 +26,7 @@ export default function Topbar({ onMenuClick }) {
   const [query, setQuery] = useState('');
   const [showProfile, setShowProfile] = useState(false);
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout, switchRole, isAdmin } = useAuth();
+  const { user, isAuthenticated, logout, switchRole, isAdmin, isTestMode } = useAuth();
   const { stats, complaints } = useComplaints();
   const { notify } = useToast();
 
@@ -250,20 +250,29 @@ export default function Topbar({ onMenuClick }) {
                 )}
               </div>
 
-              {/* Developer Testing: Switch Role Button */}
-              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-ink-400">
-                  Developer Testing Switch
-                </p>
-                <button
-                  type="button"
-                  onClick={handleSwitchRole}
-                  className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-300 py-2 text-xs font-bold text-ink-700 hover:bg-slate-100 transition shadow-sm"
-                >
-                  <ArrowRightLeft size={14} />
-                  Switch to {isAdmin ? 'Student (Riya Sharma)' : 'Authority (Dr. Rajesh Verma)'}
-                </button>
-              </div>
+              {/* Developer Testing: Switch Role Button (Only visible in /test mode) */}
+              {isTestMode && (
+                <div className="mt-4 rounded-2xl border border-dashed border-amber-300 bg-amber-50/70 p-3">
+                  <div className="flex items-center justify-between text-[11px] text-amber-800">
+                    <span className="font-bold uppercase tracking-wider">🧪 /test Mode Active</span>
+                    <Link
+                      to="/test"
+                      onClick={() => setShowProfile(false)}
+                      className="text-[10px] text-amber-700 underline font-semibold"
+                    >
+                      Console
+                    </Link>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSwitchRole}
+                    className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500 py-2 text-xs font-bold text-ink hover:bg-amber-400 transition shadow-sm"
+                  >
+                    <ArrowRightLeft size={14} />
+                    Switch to {isAdmin ? 'Student (Riya Sharma)' : 'Authority (Dr. Rajesh Verma)'}
+                  </button>
+                </div>
+              )}
 
               {/* Quick Links */}
               <div className="mt-3 grid grid-cols-2 gap-2">

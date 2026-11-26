@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
   Building2,
@@ -17,7 +17,7 @@ import { useToast } from '../context/ToastContext';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, loginAsStudent, loginAsAdmin } = useAuth();
+  const { login, loginAsStudent, loginAsAdmin, isTestMode } = useAuth();
   const { notify } = useToast();
 
   const [selectedRole, setSelectedRole] = useState('student');
@@ -108,17 +108,23 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Developer 1-Click Testing Box */}
-        <div className="mb-6 rounded-3xl border-2 border-brand-200 bg-brand-50/50 p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-brand-600" />
-            <span className="text-xs font-extrabold uppercase tracking-wider text-brand-700">
-              Developer Quick Testing (1-Click Login)
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-ink-600">
-            Click either sample account below to test the corresponding experience instantly:
-          </p>
+        {/* Developer 1-Click Testing Box (Only visible in /test mode) */}
+        {isTestMode && (
+          <div className="mb-6 rounded-3xl border-2 border-amber-300 bg-amber-50/70 p-5 shadow-sm animate-fade-in">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-amber-600" />
+                <span className="text-xs font-extrabold uppercase tracking-wider text-amber-800">
+                  🧪 /test Mode Active: 1-Click Personas
+                </span>
+              </div>
+              <Link to="/test" className="text-xs font-bold text-amber-700 hover:underline">
+                Open /test Console &rarr;
+              </Link>
+            </div>
+            <p className="mt-1 text-xs text-ink-600">
+              Click either persona below to test that side of the application instantly:
+            </p>
 
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Student Card */}
@@ -156,6 +162,7 @@ export default function Login() {
             </button>
           </div>
         </div>
+        )}
 
         {/* Regular Login Form Card */}
         <div className="card p-6 sm:p-8">
@@ -256,6 +263,16 @@ export default function Login() {
             >
               Sign In as {selectedRole === 'student' ? 'Student' : 'Authority'}
             </button>
+
+            {/* Subtle Developer Entry */}
+            <div className="pt-2 text-center">
+              <Link
+                to="/test"
+                className="text-[11px] text-ink-400 hover:text-amber-600 transition"
+              >
+                Developer QA & Verification Sandbox? <strong className="underline">Type /test</strong>
+              </Link>
+            </div>
           </form>
         </div>
       </div>

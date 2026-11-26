@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import DeveloperTestBar from './DeveloperTestBar';
 
 export default function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -22,6 +23,8 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+      {/* Floating Developer Test Bar (Only visible when /test or test mode is active!) */}
+      <DeveloperTestBar />
     </div>
   );
 }

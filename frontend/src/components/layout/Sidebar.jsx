@@ -18,7 +18,7 @@ import { useComplaints } from '../../context/ComplaintsContext';
 
 export default function Sidebar({ open, onClose }) {
   const { stats } = useComplaints();
-  const { user, isAdmin, switchRole, activeCollege } = useAuth();
+  const { user, isAdmin, switchRole, activeCollege, isTestMode } = useAuth();
 
   const studentNav = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -124,23 +124,29 @@ export default function Sidebar({ open, onClose }) {
           ))}
         </nav>
 
-        {/* Role Quick Switcher for Developer Testing */}
-        <div className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-3">
-          <div className="flex items-center justify-between text-[11px] text-ink-300">
-            <span>Active Role</span>
-            <span className="font-bold uppercase text-white tracking-wider">
-              {isAdmin ? 'Authority (Admin)' : 'Student'}
-            </span>
+        {/* Role Quick Switcher for Developer Testing (Only visible when /test mode is active) */}
+        {isTestMode && (
+          <div className="mt-4 rounded-2xl bg-amber-500/15 border border-amber-400/40 p-3">
+            <div className="flex items-center justify-between text-[11px] text-amber-300">
+              <span className="font-extrabold uppercase tracking-wider">🧪 /test Active</span>
+              <Link to="/test" onClick={onClose} className="text-[10px] text-amber-400 hover:underline">
+                Open Console
+              </Link>
+            </div>
+            <div className="mt-1 flex items-center justify-between text-xs text-white">
+              <span>Current Role:</span>
+              <span className="font-bold text-amber-300">{isAdmin ? 'Authority' : 'Student'}</span>
+            </div>
+            <button
+              type="button"
+              onClick={switchRole}
+              className="mt-2.5 w-full flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 py-1.5 text-xs font-extrabold text-ink hover:bg-amber-400 transition shadow-sm"
+            >
+              <ArrowRightLeft size={13} />
+              Switch to {isAdmin ? 'Student' : 'Authority'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={switchRole}
-            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-xl bg-white/10 py-1.5 text-xs font-semibold text-white hover:bg-white/20 transition"
-          >
-            <ArrowRightLeft size={13} />
-            Switch to {isAdmin ? 'Student View' : 'Admin Console'}
-          </button>
-        </div>
+        )}
 
         {/* Support Card */}
         <div className="relative mt-4 overflow-hidden rounded-3xl bg-white/10 p-4">
