@@ -83,10 +83,13 @@ def init_db():
             name TEXT NOT NULL,
             role TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
+            phone TEXT,
             roll_no TEXT,
             emp_id TEXT,
             department TEXT NOT NULL,
             designation TEXT,
+            class_year TEXT,
+            password_hash TEXT,
             college_code TEXT NOT NULL,
             created_at TEXT NOT NULL
         )
@@ -94,8 +97,24 @@ def init_db():
     )
     conn.commit()
 
-    # Seed MSIT as the test case affiliated college if empty
+    # Migrate missing columns if not present in existing table
     cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(users)")
+    user_cols = [c[1] for c in cursor.fetchall()]
+    if "phone" not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN phone TEXT")
+    if "class_year" not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN class_year TEXT")
+    if "password_hash" not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+        conn.commit()
+
+    # Update phone numbers for default seeded personas if missing
+    cursor.execute("UPDATE users SET phone = '+91 98765 43210' WHERE id = 'USR-STU-01' AND (phone IS NULL OR phone = '')")
+    cursor.execute("UPDATE users SET phone = '+91 98111 22334' WHERE id = 'USR-ADM-01' AND (phone IS NULL OR phone = '')")
+    conn.commit()
+
+    # Seed MSIT as the test case affiliated college if empty
     cursor.execute("SELECT COUNT(*) FROM affiliated_colleges")
     if cursor.fetchone()[0] == 0:
         now = datetime.now(timezone.utc).isoformat()
@@ -129,10 +148,13 @@ def init_db():
                 "Riya Sharma",
                 "student",
                 "riya.sharma@campusconnect.edu",
+                "+91 98765 43210",
                 "22CS1042",
                 None,
                 "Computer Science",
-                "B.Tech Student (3rd Year)",
+                "B.Tech Student",
+                "B.Tech CSE - 3rd Year",
+                None,
                 "MSIT",
                 now,
             ),
@@ -141,10 +163,13 @@ def init_db():
                 "Dr. Rajesh Verma",
                 "admin",
                 "dean.admin@msit.in",
+                "+91 98111 22334",
                 None,
                 "MSIT-ADM-042",
                 "Campus Administration",
                 "Chief Grievance Officer & Dean",
+                None,
+                None,
                 "MSIT",
                 now,
             ),
@@ -152,8 +177,8 @@ def init_db():
         cursor.executemany(
             """
             INSERT INTO users (
-                id, name, role, email, roll_no, emp_id, department, designation, college_code, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                id, name, role, email, phone, roll_no, emp_id, department, designation, class_year, password_hash, college_code, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             users_seed,
         )
@@ -459,18 +484,111 @@ def get_college_by_code(code: str):
 
 def user_row_to_dict(row: sqlite3.Row) -> dict:
     """Formats a users DB row into camelCase JSON."""
+    keys = row.keys()
     return {
         "id": row["id"],
         "name": row["name"],
         "role": row["role"],
         "email": row["email"],
+        "phone": row["phone"] if "phone" in keys else "",
         "rollNo": row["roll_no"],
         "empId": row["emp_id"],
         "department": row["department"],
         "designation": row["designation"],
+        "classYear": row["class_year"] if "class_year" in keys else "",
         "collegeCode": row["college_code"],
         "createdAt": row["created_at"],
     }
+
+
+def register_user(data: dict) -> dict:
+    """
+    Registers a new user. Returns the created user dict.
+    Raises ValueError if phone/email/roll_no already exists.
+    """
+    import hashlib, os
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Duplicate checks
+    if data.get("email"):
+        cursor.execute("SELECT id FROM users WHERE email = ?", (data["email"].strip(),))
+        if cursor.fetchone():
+            conn.close()
+            raise ValueError("An account with this email already exists.")
+    if data.get("phone"):
+        last10 = data["phone"].strip()[-10:]
+        cursor.execute("SELECT id FROM users WHERE phone LIKE ?", (f"%{last10}%",))
+        if cursor.fetchone():
+            conn.close()
+            raise ValueError("An account with this mobile number already exists.")
+    if data.get("rollNo") and data.get("role") == "student":
+        cursor.execute("SELECT id FROM users WHERE roll_no = ? AND college_code = ?",
+                       (data["rollNo"].strip().upper(), data["collegeCode"].strip()))
+        if cursor.fetchone():
+            conn.close()
+            raise ValueError("An account with this Enrollment/Roll Number already exists for this college.")
+    if data.get("empId") and data.get("role") == "admin":
+        cursor.execute("SELECT id FROM users WHERE emp_id = ? AND college_code = ?",
+                       (data["empId"].strip().upper(), data["collegeCode"].strip()))
+        if cursor.fetchone():
+            conn.close()
+            raise ValueError("An account with this Employee ID already exists for this college.")
+
+    now = datetime.now(timezone.utc).isoformat()
+    # Generate a unique user ID
+    prefix = "USR-STU" if data.get("role") == "student" else "USR-ADM"
+    cursor.execute("SELECT COUNT(*) FROM users WHERE role = ?", (data["role"],))
+    count = cursor.fetchone()[0] + 1
+    user_id = f"{prefix}-{count:03d}"
+
+    # Simple password hash (SHA-256 + salt for demo — use bcrypt in production)
+    raw_password = data.get("password", "")
+    salt = os.urandom(16).hex()
+    pw_hash = hashlib.sha256(f"{salt}:{raw_password}".encode()).hexdigest() if raw_password else None
+    pw_stored = f"{salt}:{pw_hash}" if pw_hash else None
+
+    # Placeholder email for students who didn't provide one
+    email_val = (data.get("email") or "").strip() or f"student.{user_id.lower().replace('-', '')}@campusconnect.local"
+
+    cursor.execute(
+        """
+        INSERT INTO users (
+            id, name, role, email, phone, roll_no, emp_id, department, designation,
+            class_year, password_hash, college_code, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            user_id,
+            data["name"].strip(),
+            data["role"],
+            email_val,
+            (data.get("phone") or "").strip() or None,
+            (data.get("rollNo") or "").strip().upper() or None,
+            (data.get("empId") or "").strip().upper() or None,
+            data["department"].strip(),
+            (data.get("designation") or "").strip() or None,
+            (data.get("classYear") or "").strip() or None,
+            pw_stored,
+            data["collegeCode"].strip(),
+            now,
+        ),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return user_row_to_dict(row)
+
+
+def get_user_by_phone(phone: str):
+    """Finds a user by mobile phone number."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE phone LIKE ?", (f"%{phone.strip()[-10:]}%",))
+    row = cursor.fetchone()
+    conn.close()
+    return user_row_to_dict(row) if row else None
 
 
 def get_all_users() -> list:

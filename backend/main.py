@@ -3,11 +3,16 @@ CampusConnect Backend API
 FastAPI service connecting SQLite database and custom Data Structures to the React frontend.
 """
 
+import random
+import time
 from contextlib import asynccontextmanager
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
+# In-memory OTP store: { phone_last10: { "otp": "123456", "expires_at": float, "user_id": str } }
+_otp_store: dict = {}
 
 import database
 from data_structures import FIFOQueue, PriorityQueue
@@ -245,6 +250,123 @@ def get_dev_database_overview():
     of the local SQLite database.
     """
     return database.get_database_overview()
+
+
+# ---------------------------------------------------------------------------
+# Auth — OTP (Mobile Number Login)
+# ---------------------------------------------------------------------------
+class OTPRequest(BaseModel):
+    phone: str
+    role: str  # 'student' | 'admin'
+
+class OTPVerify(BaseModel):
+    phone: str
+    otp: str
+
+
+@app.post("/api/auth/request-otp", tags=["Auth"])
+def request_otp(body: OTPRequest):
+    """
+    Generates a 6-digit OTP for the given mobile number.
+    Returns the OTP in the response (dev/demo mode — no real SMS gateway).
+    """
+    user = database.get_user_by_phone(body.phone)
+    if not user:
+        raise HTTPException(status_code=404, detail="No account found with that mobile number.")
+
+    # Enforce role match
+    if user.get("role") != body.role:
+        raise HTTPException(status_code=403, detail=f"That mobile number is registered as '{user.get('role')}', not '{body.role}'.")
+
+    otp_code = str(random.randint(100000, 999999))
+    key = body.phone.strip()[-10:]
+    _otp_store[key] = {
+        "otp": otp_code,
+        "expires_at": time.time() + 300,  # 5 minutes TTL
+        "user_id": user["id"],
+    }
+
+    return {
+        "success": True,
+        "otp": otp_code,          # Returned in dev mode (no SMS gateway)
+        "message": "OTP generated (dev mode — shown here since no SMS gateway is configured).",
+        "user_name": user["name"],
+    }
+
+
+@app.post("/api/auth/verify-otp", tags=["Auth"])
+def verify_otp(body: OTPVerify):
+    """
+    Verifies the OTP and returns user data on success.
+    """
+    key = body.phone.strip()[-10:]
+    record = _otp_store.get(key)
+
+    if not record:
+        raise HTTPException(status_code=400, detail="No OTP was requested for this number. Please request one first.")
+
+    if time.time() > record["expires_at"]:
+        del _otp_store[key]
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+
+    if body.otp.strip() != record["otp"]:
+        raise HTTPException(status_code=400, detail="Incorrect OTP. Please try again.")
+
+    # Success — fetch user and clear OTP
+    del _otp_store[key]
+    user = database.get_user_by_id(record["user_id"])
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    return {"success": True, "user": user}
+
+
+# ---------------------------------------------------------------------------
+# Auth — Registration
+# ---------------------------------------------------------------------------
+class RegisterRequest(BaseModel):
+    name: str
+    role: str                    # 'student' | 'admin'
+    phone: str
+    department: str
+    collegeCode: str
+    password: str
+    # Student-specific
+    rollNo: Optional[str] = None
+    classYear: Optional[str] = None
+    email: Optional[str] = None  # optional for students
+    # Admin-specific
+    empId: Optional[str] = None
+    designation: Optional[str] = None
+
+
+@app.post("/api/auth/register", status_code=status.HTTP_201_CREATED, tags=["Auth"])
+def register_user(body: RegisterRequest):
+    """
+    Registers a new student or admin.
+    Students: name, phone, department, rollNo, classYear required; email optional.
+    Admins: name, phone, department, empId, designation, email all required.
+    """
+    data = body.model_dump()
+
+    # Role-specific field validation
+    if body.role == "student":
+        missing = [f for f in ["name", "phone", "department", "rollNo", "classYear"] if not data.get(f)]
+        if missing:
+            raise HTTPException(status_code=422, detail=f"Missing required fields: {', '.join(missing)}")
+    elif body.role == "admin":
+        missing = [f for f in ["name", "phone", "department", "empId", "designation", "email"] if not data.get(f)]
+        if missing:
+            raise HTTPException(status_code=422, detail=f"Missing required fields: {', '.join(missing)}")
+    else:
+        raise HTTPException(status_code=422, detail="Role must be 'student' or 'admin'.")
+
+    try:
+        user = database.register_user(data)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+    return {"success": True, "user": user, "message": "Account created successfully."}
 
 
 

@@ -12,6 +12,7 @@ import {
   LogOut,
   Mail,
   Menu,
+  Phone,
   PackageSearch,
   Search,
   Shield,
@@ -234,6 +235,14 @@ export default function Topbar({ onMenuClick }) {
                   </span>
                   <span className="font-medium text-ink">{user.email}</span>
                 </div>
+                {user.phone && (
+                  <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3.5 py-2">
+                    <span className="flex items-center gap-2 text-ink-500">
+                      <Phone size={14} /> Phone
+                    </span>
+                    <span className="font-medium text-ink">{user.phone}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3.5 py-2">
                   <span className="flex items-center gap-2 text-ink-500">
                     <GraduationCap size={14} /> Department

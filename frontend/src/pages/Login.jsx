@@ -1,16 +1,21 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
+  BookOpen,
   Building2,
   CheckCircle2,
   GraduationCap,
+  Hash,
+  IdCard,
   Lock,
   Mail,
+  Phone,
   Shield,
   ShieldCheck,
   Sparkles,
   User,
+  UserPlus,
 } from 'lucide-react';
 import { AFFILIATED_COLLEGES, DEMO_ADMIN, DEMO_STUDENT, useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -24,6 +29,145 @@ export default function Login() {
   const [selectedCollege, setSelectedCollege] = useState('MSIT');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // Top-level page mode: 'login' | 'signup'
+  const [pageMode, setPageMode] = useState('login');
+
+  // Registration form state
+  const [reg, setReg] = useState({
+    name: '', phone: '', department: '', password: '', confirmPassword: '',
+    // Student fields
+    rollNo: '', classYear: '', email: '',
+    // Admin fields
+    empId: '', designation: '', adminEmail: '',
+  });
+  const [regLoading, setRegLoading] = useState(false);
+
+  const setRegField = (field) => (e) => setReg((r) => ({ ...r, [field]: e.target.value }));
+
+  const CLASS_YEARS = [
+    '1st Year', '2nd Year', '3rd Year', '4th Year',
+    'B.Tech CSE - 1st Year', 'B.Tech CSE - 2nd Year', 'B.Tech CSE - 3rd Year', 'B.Tech CSE - 4th Year',
+    'B.Tech ECE - 1st Year', 'B.Tech ECE - 2nd Year', 'B.Tech ECE - 3rd Year', 'B.Tech ECE - 4th Year',
+    'B.Tech IT - 1st Year', 'B.Tech IT - 2nd Year', 'B.Tech IT - 3rd Year', 'B.Tech IT - 4th Year',
+    'M.Tech - 1st Year', 'M.Tech - 2nd Year', 'MBA - 1st Year', 'MBA - 2nd Year', 'PhD Scholar',
+  ];
+
+  const DEPARTMENTS = [
+    'Computer Science', 'Information Technology', 'Electronics & Communication',
+    'Mechanical Engineering', 'Civil Engineering', 'Electrical Engineering',
+    'Applied Sciences', 'Campus Administration', 'Facilities & Infrastructure',
+    'Academic Affairs', 'Student Affairs', 'Finance & Accounts',
+  ];
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    if (reg.password !== reg.confirmPassword) {
+      notify({ type: 'error', title: 'Password Mismatch', message: 'Passwords do not match.' });
+      return;
+    }
+    if (reg.password.length < 6) {
+      notify({ type: 'error', title: 'Weak Password', message: 'Password must be at least 6 characters.' });
+      return;
+    }
+    setRegLoading(true);
+    try {
+      const payload = {
+        name: reg.name,
+        role: selectedRole,
+        phone: reg.phone,
+        department: reg.department,
+        collegeCode: selectedCollege,
+        password: reg.password,
+        ...(selectedRole === 'student'
+          ? { rollNo: reg.rollNo, classYear: reg.classYear, email: reg.email || undefined }
+          : { empId: reg.empId, designation: reg.designation, email: reg.adminEmail }),
+      };
+      const res = await fetch('http://localhost:8000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Registration failed');
+      login(data.user);
+      notify({ type: 'success', title: 'Account Created!', message: `Welcome to CampusConnect, ${data.user.name}!` });
+      navigate(data.user.role === 'admin' ? '/admin' : '/');
+    } catch (err) {
+      notify({ type: 'error', title: 'Registration Failed', message: err.message });
+    } finally {
+      setRegLoading(false);
+    }
+  };
+
+  // OTP Login state
+  const [loginMode, setLoginMode] = useState('email'); // 'email' | 'otp'
+  const [otpPhone, setOtpPhone] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+
+  // Countdown timer for OTP resend
+  useEffect(() => {
+    if (resendTimer <= 0) return;
+    const id = setInterval(() => setResendTimer((t) => t - 1), 1000);
+    return () => clearInterval(id);
+  }, [resendTimer]);
+
+  const handleSendOtp = async () => {
+    const digits = otpPhone.replace(/\D/g, '');
+    if (digits.length < 10) {
+      notify({ type: 'error', title: 'Invalid Number', message: 'Please enter a valid 10-digit mobile number.' });
+      return;
+    }
+    setOtpLoading(true);
+    try {
+      const res = await fetch('http://localhost:8000/api/auth/request-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: otpPhone, role: selectedRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to send OTP');
+      setOtpSent(true);
+      setResendTimer(30);
+      notify({
+        type: 'info',
+        title: `OTP for ${data.user_name}`,
+        message: `Your OTP is: ${data.otp}  (dev mode — valid 5 mins)`,
+      });
+    } catch (err) {
+      notify({ type: 'error', title: 'OTP Error', message: err.message });
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (otpCode.length !== 6) {
+      notify({ type: 'error', title: 'Enter OTP', message: 'Please enter the 6-digit OTP.' });
+      return;
+    }
+    setOtpLoading(true);
+    try {
+      const res = await fetch('http://localhost:8000/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: otpPhone, otp: otpCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'OTP verification failed');
+      login(data.user);
+      notify({ type: 'success', title: 'Login Successful', message: `Welcome, ${data.user.name}!` });
+      navigate(data.user.role === 'admin' ? '/admin' : '/');
+    } catch (err) {
+      notify({ type: 'error', title: 'Verification Failed', message: err.message });
+    } finally {
+      setOtpLoading(false);
+    }
+  };
 
   const handleCustomLogin = (e) => {
     e.preventDefault();
@@ -219,50 +363,137 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Email / ID */}
-            <div>
-              <label className="block text-xs font-semibold text-ink-700 mb-1">
-                {selectedRole === 'student' ? 'Student College Email / Roll Number' : 'Authority Work Email / Employee ID'}
-              </label>
-              <div className="relative">
-                <Mail size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
-                <input
-                  type="text"
-                  placeholder={selectedRole === 'student' ? '22CS1042 or riya.sharma@msit.in' : 'admin.grievance@msit.in'}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input pl-10"
-                />
-              </div>
+            {/* Login Mode Toggle */}
+            <div className="flex rounded-xl border border-slate-200 bg-slate-100 p-1 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setLoginMode('email')}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 transition ${loginMode === 'email' ? 'bg-white shadow text-ink font-bold' : 'text-ink-500 hover:text-ink'}`}
+              >
+                <Mail size={13} /> Email / Password
+              </button>
+              <button
+                type="button"
+                onClick={() => { setLoginMode('otp'); setOtpSent(false); setOtpCode(''); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 transition ${loginMode === 'otp' ? 'bg-white shadow text-ink font-bold' : 'text-ink-500 hover:text-ink'}`}
+              >
+                <Phone size={13} /> Mobile OTP
+              </button>
             </div>
 
-            {/* Password */}
-            <div>
-              <label className="block text-xs font-semibold text-ink-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <Lock size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input pl-10"
-                />
-              </div>
-            </div>
+            {loginMode === 'email' ? (
+              <>
+                {/* Email / ID */}
+                <div>
+                  <label className="block text-xs font-semibold text-ink-700 mb-1">
+                    {selectedRole === 'student' ? 'Student College Email / Roll Number' : 'Authority Work Email / Employee ID'}
+                  </label>
+                  <div className="relative">
+                    <Mail size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
+                    <input
+                      type="text"
+                      placeholder={selectedRole === 'student' ? '22CS1042 or riya.sharma@msit.in' : 'admin.grievance@msit.in'}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="input pl-10"
+                    />
+                  </div>
+                </div>
 
-            <button
-              type="submit"
-              className={`w-full btn rounded-xl py-3 text-white font-bold transition shadow-sm ${
-                selectedRole === 'admin'
-                  ? 'bg-amber-600 hover:bg-amber-500'
-                  : 'bg-brand-600 hover:bg-brand-500'
-              }`}
-            >
-              Sign In as {selectedRole === 'student' ? 'Student' : 'Authority'}
-            </button>
+                {/* Password */}
+                <div>
+                  <label className="block text-xs font-semibold text-ink-700 mb-1">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <Lock size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="input pl-10"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className={`w-full btn rounded-xl py-3 text-white font-bold transition shadow-sm ${
+                    selectedRole === 'admin'
+                      ? 'bg-amber-600 hover:bg-amber-500'
+                      : 'bg-brand-600 hover:bg-brand-500'
+                  }`}
+                >
+                  Sign In as {selectedRole === 'student' ? 'Student' : 'Authority'}
+                </button>
+              </>
+            ) : (
+              /* OTP Login Flow */
+              <div className="space-y-4">
+                {/* Phone input */}
+                <div>
+                  <label className="block text-xs font-semibold text-ink-700 mb-1">
+                    Registered Mobile Number
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Phone size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
+                      <input
+                        type="tel"
+                        placeholder="9876543210"
+                        value={otpPhone}
+                        onChange={(e) => setOtpPhone(e.target.value)}
+                        maxLength={13}
+                        disabled={otpSent}
+                        className="input pl-10 disabled:opacity-60"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={otpLoading || (otpSent && resendTimer > 0)}
+                      className={`shrink-0 rounded-xl px-4 py-2.5 text-xs font-bold text-white transition shadow-sm ${
+                        selectedRole === 'admin' ? 'bg-amber-600 hover:bg-amber-500' : 'bg-brand-600 hover:bg-brand-500'
+                      } disabled:opacity-50`}
+                    >
+                      {otpLoading ? '…' : otpSent ? (resendTimer > 0 ? `Resend (${resendTimer}s)` : 'Resend OTP') : 'Send OTP'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* OTP code input — appears after OTP sent */}
+                {otpSent && (
+                  <div>
+                    <label className="block text-xs font-semibold text-ink-700 mb-1">
+                      Enter 6-digit OTP <span className="font-normal text-brand-600">(check the toast notification)</span>
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="123456"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      maxLength={6}
+                      className="input text-center tracking-[0.5em] text-lg font-mono font-bold"
+                    />
+                  </div>
+                )}
+
+                {otpSent && (
+                  <button
+                    type="button"
+                    onClick={handleVerifyOtp}
+                    disabled={otpLoading || otpCode.length !== 6}
+                    className={`w-full btn rounded-xl py-3 text-white font-bold transition shadow-sm ${
+                      selectedRole === 'admin' ? 'bg-amber-600 hover:bg-amber-500' : 'bg-brand-600 hover:bg-brand-500'
+                    } disabled:opacity-50`}
+                  >
+                    {otpLoading ? 'Verifying…' : 'Verify & Sign In'}
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Subtle Developer Entry */}
             <div className="pt-2 text-center">
@@ -270,7 +501,7 @@ export default function Login() {
                 to="/test"
                 className="text-[11px] text-ink-400 hover:text-amber-600 transition"
               >
-                Developer QA & Verification Sandbox? <strong className="underline">Type /test</strong>
+                Developer QA &amp; Verification Sandbox? <strong className="underline">Type /test</strong>
               </Link>
             </div>
           </form>

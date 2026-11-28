@@ -153,6 +153,7 @@ export default function TestConsole() {
                   <span>•</span>
                   <span>{DEMO_STUDENT.collegeCode}</span>
                 </div>
+                <div className="mt-0.5 text-[11px] text-ink-400 font-mono">📱 {DEMO_STUDENT.phone}</div>
               </div>
             </div>
 
@@ -230,6 +231,7 @@ export default function TestConsole() {
                   <span>•</span>
                   <span>{DEMO_ADMIN.collegeCode}</span>
                 </div>
+                <div className="mt-0.5 text-[11px] text-ink-400 font-mono">📱 {DEMO_ADMIN.phone}</div>
               </div>
             </div>
 
@@ -274,6 +276,29 @@ export default function TestConsole() {
                 </Link>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* OTP Login Test Guide */}
+      <section className="rounded-3xl border border-blue-200 bg-blue-50/60 p-6 space-y-3">
+        <h2 className="text-base font-bold text-blue-900 flex items-center gap-2">
+          📱 Mobile OTP Login — Test Guide
+        </h2>
+        <p className="text-xs text-blue-800 leading-relaxed">
+          Use the <strong>Mobile OTP</strong> tab on the Login page to test OTP-based sign-in.
+          Since no SMS gateway is configured, the generated OTP is <strong>returned directly in the toast notification</strong>.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div className="rounded-xl bg-white border border-blue-100 p-3 space-y-1">
+            <p className="font-bold text-brand-700">🎓 Student — Riya Sharma</p>
+            <p className="font-mono text-ink-600">Mobile: 9876543210</p>
+            <p className="text-ink-500">Select <em>Student</em> role → Mobile OTP tab → enter number → Send OTP → copy from toast → Verify</p>
+          </div>
+          <div className="rounded-xl bg-white border border-blue-100 p-3 space-y-1">
+            <p className="font-bold text-amber-700">🛡️ Authority — Dr. Rajesh Verma</p>
+            <p className="font-mono text-ink-600">Mobile: 9811122334</p>
+            <p className="text-ink-500">Select <em>Authority</em> role → Mobile OTP tab → enter number → Send OTP → copy from toast → Verify</p>
           </div>
         </div>
       </section>
